@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>underleaf</title>
+    <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <span class="brand">under<b>leaf</b></span>
+      <span id="connection" class="connection" hidden>disconnected — is <code>bun dev</code> running?</span>
+      <span class="spacer"></span>
+      <button id="toggle-tree" class="toggle on" title="Toggle file tree">Files</button>
+      <button id="toggle-claude" class="toggle on" title="Toggle Claude Code">Claude</button>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <nav id="tree-pane" class="pane tree-pane" aria-label="Files">
+        <div id="tree" class="tree"></div>
+      </nav>
+      <div class="splitter" data-pane="tree-pane" data-var="--tree-w"></div>
+
+      <section id="claude-pane" class="pane claude-pane">
+        <div class="pane-head">
+          <span class="pane-title">Claude Code</span>
+          <span class="hint">working in <code>latex/</code></span>
+        </div>
+        <div id="terminal" class="terminal"></div>
+      </section>
+      <div class="splitter" data-pane="claude-pane" data-var="--claude-w"></div>
+
+      <section class="pane preview-pane">
+        <div class="pane-head">
+          <span id="preview-title" class="pane-title">Preview</span>
+          <span id="status" class="status"></span>
+          <span class="spacer"></span>
+          <div id="zoom" class="zoom" role="group" aria-label="Zoom">
+            <button id="zoom-out" title="Zoom out">−</button>
+            <button id="zoom-fit" title="Fit width">Fit</button>
+            <button id="zoom-in" title="Zoom in">+</button>
+          </div>
+          <button id="toggle-logs" class="ghost" hidden>Logs</button>
+          <button id="export" class="primary" hidden title="Save the PDF into resumes/">Save PDF</button>
+          <a id="download" class="ghost icon" hidden title="Download">⤓</a>
+        </div>
+        <div class="preview-body">
+          <div id="viewer" class="viewer"></div>
+          <aside id="logs" class="logs" hidden><ul id="diagnostics"></ul></aside>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+    <script type="module" src="./app.ts"></script>
+  </body>
+</html>
