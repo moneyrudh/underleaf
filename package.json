@@ -1,0 +1,23 @@
+{
+  "name": "underleaf",
+  "version": "0.1.0",
+  "description": "Overleaf-style live LaTeX preview, running locally",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun src/server.ts",
+    "dev:ui": "UNDERLEAF_DEV=1 bun src/server.ts",
+    "pdf": "bun src/cli.ts pdf",
+    "doctor": "bun src/cli.ts doctor",
+    "typecheck": "bunx --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "pdfjs-dist": "^6.4.299"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^7.0.2"
+  }
+}
