@@ -12,13 +12,19 @@
       <span class="brand">under<b>leaf</b></span>
       <span id="connection" class="connection" hidden>disconnected — is <code>bun dev</code> running?</span>
       <span class="spacer"></span>
+      <button id="quick-open" class="search" title="Go to file">
+        <span>Go to file…</span><kbd data-key="mod+p"></kbd>
+      </button>
+      <span class="spacer"></span>
       <button id="toggle-tree" class="toggle on" title="Toggle file tree">Files</button>
       <button id="toggle-claude" class="toggle on" title="Toggle Claude Code">Claude</button>
+      <button id="help" class="toggle icon" title="Keyboard shortcuts (?)">?</button>
     </header>
 
     <main id="workspace" class="workspace">
-      <nav id="tree-pane" class="pane tree-pane" aria-label="Files">
-        <div id="tree" class="tree"></div>
+      <nav id="tree-pane" class="pane tree-pane" tabindex="0" aria-label="Files">
+        <div class="pane-head"><span class="pane-title">Files</span></div>
+        <div id="tree" class="tree" role="tree"></div>
       </nav>
       <div class="splitter" data-pane="tree-pane" data-var="--tree-w"></div>
 
@@ -31,27 +37,44 @@
       </section>
       <div class="splitter" data-pane="claude-pane" data-var="--claude-w"></div>
 
-      <section class="pane preview-pane">
+      <section id="preview-pane" class="pane preview-pane" tabindex="0">
         <div class="pane-head">
           <span id="preview-title" class="pane-title">Preview</span>
           <span id="status" class="status"></span>
           <span class="spacer"></span>
           <div id="zoom" class="zoom" role="group" aria-label="Zoom">
-            <button id="zoom-out" title="Zoom out">−</button>
-            <button id="zoom-fit" title="Fit width">Fit</button>
-            <button id="zoom-in" title="Zoom in">+</button>
+            <button id="zoom-out" title="Zoom out (-)">−</button>
+            <button id="zoom-fit" title="Fit width (=)">Fit</button>
+            <button id="zoom-in" title="Zoom in (+)">+</button>
           </div>
-          <button id="toggle-logs" class="ghost" hidden>Logs</button>
+          <button id="toggle-logs" class="ghost" hidden title="Logs (L)">Logs</button>
           <button id="export" class="primary" hidden title="Save the PDF into resumes/">Save PDF</button>
           <a id="download" class="ghost icon" hidden title="Download">⤓</a>
         </div>
-        <div class="preview-body">
+        <div id="preview-body" class="preview-body">
           <div id="viewer" class="viewer"></div>
           <aside id="logs" class="logs" hidden><ul id="diagnostics"></ul></aside>
         </div>
       </section>
     </main>
 
+    <div id="palette" class="overlay" hidden>
+      <div class="palette" role="dialog" aria-label="Quick open">
+        <input id="palette-input" autocomplete="off" spellcheck="false" />
+        <ul id="palette-list"></ul>
+      </div>
+    </div>
+
+    <div id="cheatsheet" class="overlay" tabindex="-1" hidden>
+      <div class="sheet" role="dialog" aria-label="Keyboard shortcuts">
+        <div class="sheet-head"><span>Keyboard shortcuts</span><kbd>Esc</kbd></div>
+        <div id="cheatsheet-body" class="sheet-body"></div>
+      </div>
+    </div>
+
+    <div id="leader" class="leader" hidden>
+      <kbd>h</kbd><kbd>l</kbd> move · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> pane · <kbd>z</kbd> zoom pane
+    </div>
     <div id="toast" class="toast" hidden></div>
     <script type="module" src="./app.ts"></script>
   </body>

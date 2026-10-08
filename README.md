@@ -64,6 +64,26 @@ Hidden files (dotfiles) and symlinks are left out of the tree.
 
 It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. If Claude exits, press Enter to start a new one. Toggle the pane with **Claude** in the top bar.
 
+### Keyboard
+
+Press `?` (or the **?** button) for the full list. The essentials:
+
+| Key | Action |
+|---|---|
+| `⌘P` / `Ctrl+P` | Go to file (fuzzy search) |
+| `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
+| `⌘S` / `Ctrl+S` | Save PDF to `resumes/` |
+| `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
+| `Ctrl+Space` then `z` | Zoom the focused pane |
+
+Vim-style keys work when the file tree or preview has focus:
+- **Tree:** `j`/`k`, `h`/`l`, `gg`/`G`, Enter, `a` to mention the file in Claude, `y` to copy its path.
+- **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs.
+
+While Claude has focus, every other key goes to Claude, including Esc to interrupt it.
+
+On macOS, `Ctrl+Space` switches input sources if you have more than one keyboard language enabled. In that case, change or disable that shortcut in System Settings → Keyboard → Keyboard Shortcuts → Input Sources.
+
 ### Security
 
 The server only listens on `127.0.0.1`, and it rejects requests from other origins and hosts. That matters because it can drive a coding agent.

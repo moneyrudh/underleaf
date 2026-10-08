@@ -40,6 +40,17 @@ export class ClaudeSession {
     this.proc?.terminal?.resize(cols, rows);
   }
 
+  restart() {
+    const old = this.proc;
+    this.proc = undefined; // so its exit message is suppressed
+    old?.kill();
+    old?.terminal?.close();
+    this.emit("\x1b[2J\x1b[H"); // clear the screen for the fresh session
+    this.scrollback = [];
+    this.scrollbackSize = 0;
+    this.start();
+  }
+
   stop() {
     this.proc?.kill();
   }

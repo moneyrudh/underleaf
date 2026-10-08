@@ -10,6 +10,8 @@ const logs = $("logs");
 const logsButton = $("toggle-logs");
 const diagnosticsEl = $("diagnostics");
 const statusEl = $("status");
+const body = $("preview-body"); // carries the busy/stale bar along its top edge
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 let currentPdf: string | null = null;
 let zoom: number | "fit" = "fit";
@@ -19,11 +21,13 @@ let renderToken = 0;
 export function setStatus(text: string, kind: "ok" | "busy" | "fail" | "info" | "" = "") {
   statusEl.textContent = text;
   statusEl.className = `status ${kind}`;
+  body.classList.toggle("busy", kind === "busy");
 }
 
 /** Show a PDF; re-renders only when the URL changes (it carries a version). */
 export function showPdf(url: string, { stale = false } = {}) {
   viewer.classList.toggle("stale", stale);
+  body.classList.toggle("stale", stale);
   if (url === currentPdf) return;
   currentPdf = url;
   render();
@@ -62,6 +66,7 @@ function reset() {
   currentPdf = null;
   renderToken++;
   viewer.classList.remove("stale");
+  body.classList.remove("stale");
 }
 
 /** Render every page off-screen, then swap in one step so the preview never flickers or loses scroll. */
@@ -93,9 +98,11 @@ async function render() {
     }
 
     const { scrollTop, scrollLeft } = viewer;
+    const rebuild = viewer.querySelector(".pages") !== null;
     viewer.replaceChildren(pagesEl);
     viewer.scrollTop = scrollTop;
     viewer.scrollLeft = scrollLeft;
+    if (rebuild && !reduceMotion.matches) pagesEl.animate([{ opacity: 0.7 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
   } catch (err) {
     if (token === renderToken) showMessage(`Couldn't render this PDF.<br><small>${String(err).replace(/</g, "&lt;")}</small>`);
   } finally {
@@ -112,7 +119,7 @@ export function refit() {
 
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3];
 
-function stepZoom(dir: 1 | -1) {
+export function stepZoom(dir: 1 | -1) {
   const now = zoom === "fit" ? renderedScale : zoom;
   const next = dir > 0 ? ZOOM_STEPS.find((z) => z > now + 0.01) : [...ZOOM_STEPS].reverse().find((z) => z < now - 0.01);
   if (next === undefined) return;
@@ -122,10 +129,22 @@ function stepZoom(dir: 1 | -1) {
 
 $("zoom-in").onclick = () => stepZoom(1);
 $("zoom-out").onclick = () => stepZoom(-1);
-$("zoom-fit").onclick = () => {
+export function fitWidth() {
   zoom = "fit";
   render();
-};
+}
+$("zoom-fit").onclick = fitWidth;
+
+// ---------- keyboard scrolling ----------
+
+export function scroll(how: "down" | "up" | "half-down" | "half-up" | "top" | "bottom") {
+  const half = viewer.clientHeight / 2;
+  const behavior = reduceMotion.matches ? "instant" : "smooth";
+  if (how === "top") return viewer.scrollTo({ top: 0, behavior });
+  if (how === "bottom") return viewer.scrollTo({ top: viewer.scrollHeight, behavior });
+  const by = { down: 70, up: -70, "half-down": half, "half-up": -half }[how];
+  viewer.scrollBy({ top: by, behavior: how.startsWith("half") ? behavior : "instant" });
+}
 
 new ResizeObserver(() => {
   clearTimeout(resizeTimer);
@@ -135,7 +154,21 @@ let resizeTimer: ReturnType<typeof setTimeout>;
 
 // ---------- logs ----------
 
-logsButton.onclick = () => (logs.hidden = !logs.hidden);
+export function toggleLogs() {
+  if (!logsButton.hidden) logs.hidden = !logs.hidden;
+}
+logsButton.onclick = toggleLogs;
+
+/** ]e / [e: step through diagnostics, errors first. */
+let activeDiagnostic = -1;
+export function cycleDiagnostic(dir: 1 | -1) {
+  const items = [...diagnosticsEl.querySelectorAll<HTMLElement>("li.error, li.warning")];
+  if (items.length === 0 || logsButton.hidden) return;
+  logs.hidden = false;
+  activeDiagnostic = (activeDiagnostic + dir + items.length) % items.length;
+  items.forEach((li, i) => li.classList.toggle("active", i === activeDiagnostic));
+  items[activeDiagnostic]!.scrollIntoView({ block: "nearest" });
+}
 
 export function showLogsButton(visible: boolean) {
   logsButton.hidden = !visible;
@@ -147,6 +180,7 @@ export function openLogs() {
 }
 
 export function showDiagnostics(list: Diagnostic[]) {
+  activeDiagnostic = -1;
   const errors = list.filter((d) => d.severity === "error").length;
   logsButton.textContent = list.length ? `Logs (${list.length})` : "Logs";
   logsButton.classList.toggle("has-errors", errors > 0);

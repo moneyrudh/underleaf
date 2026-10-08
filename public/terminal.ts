@@ -9,7 +9,8 @@ export class ClaudeTerminal {
   private term = new Terminal({
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
     fontSize: 13,
-    cursorBlink: true,
+    cursorBlink: false,
+    cursorInactiveStyle: "outline", // hollow cursor when another pane has focus
     allowProposedApi: true,
     theme: { background: "#141a16", foreground: "#dfe6e1", cursor: "#4caf6e", selectionBackground: "#2f4a39" },
   });
@@ -20,6 +21,9 @@ export class ClaudeTerminal {
     this.term.loadAddon(this.fit);
     this.term.open(el);
     this.term.onData((data) => this.send({ type: "input", data }));
+    // Blink only while focused, so it's obvious where typing goes.
+    this.term.textarea?.addEventListener("focus", () => (this.term.options.cursorBlink = true));
+    this.term.textarea?.addEventListener("blur", () => (this.term.options.cursorBlink = false));
     new ResizeObserver(() => this.resize()).observe(el);
   }
 
@@ -41,6 +45,19 @@ export class ClaudeTerminal {
   }
 
   focus() {
+    this.connect();
+    this.term.focus();
+  }
+
+  /** Type text into Claude's prompt (e.g. an @file mention) without sending it. */
+  paste(text: string) {
+    this.focus();
+    this.term.paste(text);
+  }
+
+  restart() {
+    this.connect();
+    this.send({ type: "restart" });
     this.term.focus();
   }
 

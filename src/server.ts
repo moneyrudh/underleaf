@@ -39,7 +39,7 @@ async function rescan() {
   docs = documentsIn(latexTree).map((d) => `latex/${d}`);
 }
 
-const treeMessage = () => JSON.stringify({ type: "tree", trees: [latexTree, resumesTree], docs });
+const treeMessage = () => JSON.stringify({ type: "tree", trees: [latexTree, resumesTree], docs, roots: ROOTS });
 
 // ---------- compiling ----------
 
@@ -229,6 +229,7 @@ const server = Bun.serve<WsData>({
       if (ws.data.channel === "claude") {
         if (msg.type === "input") claude.input(String(msg.data));
         else if (msg.type === "resize") claude.resize(Number(msg.cols), Number(msg.rows));
+        else if (msg.type === "restart") claude.restart();
         return;
       }
       if (msg.type === "open" && docs.includes(msg.doc)) {
