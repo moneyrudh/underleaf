@@ -4,7 +4,7 @@ import type { ServerWebSocket } from "bun";
 import index from "../public/index.html";
 import { compile, ENGINES, REPO, type CompileResult } from "./compile";
 import { ClaudeSession } from "./claude";
-import { CONTENT_TYPES, documentsIn, keepWatching, resolveTreePath, scanTree, type DirNode } from "./workspace";
+import { CONTENT_TYPES, documentsIn, keepWatching, resolveTreePath, scanTree, seedWorkspace, type DirNode } from "./workspace";
 
 // Usage: bun dev [latex-dir] [--resumes dir] [--port 4747] [--no-open]
 const args = process.argv.slice(2);
@@ -138,6 +138,7 @@ function onFsChange(filename: string) {
 }
 
 await keepWatching(LATEX, onFsChange);
+await seedWorkspace(LATEX, path.join(REPO, "templates"));
 await keepWatching(RESUMES, onFsChange);
 await rescan();
 

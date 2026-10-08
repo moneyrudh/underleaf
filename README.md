@@ -43,7 +43,7 @@ Options: `bun dev [latex-dir] [--resumes dir] [--port N] [--no-open]`.
 | `latex/` | Your sources. Everything in here shows up in the file tree, and Claude works here. |
 | `resumes/` | Exported PDFs. **Save PDF** writes here, mirroring the source path (`latex/acme/main.tex` → `resumes/acme/main.pdf`). |
 
-Both are git-ignored, so personal files never end up in this repo. You can make either one its own git repo if you want history. If you delete or rename either folder while the app is running, underleaf recreates it empty and keeps going.
+On first run, an empty `latex/` gets a starter `resume.tex` copied from `templates/resume.tex`. Both folders are git-ignored, so personal files never end up in this repo. You can make either one its own git repo if you want history. If you delete or rename either folder while the app is running, underleaf recreates it empty and keeps going.
 
 ### The file tree
 

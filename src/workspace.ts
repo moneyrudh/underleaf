@@ -107,3 +107,11 @@ export function keepWatching(dir: string, onChange: (filename: string) => void) 
 
   return start();
 }
+
+/** First run: give an empty workspace a starting document from templates/. */
+export async function seedWorkspace(latexDir: string, templatesDir: string) {
+  for await (const _ of new Bun.Glob("**/*.tex").scan({ cwd: latexDir })) return;
+  await mkdir(latexDir, { recursive: true });
+  await Bun.write(path.join(latexDir, "resume.tex"), Bun.file(path.join(templatesDir, "resume.tex")));
+  console.log(`seeded   ${path.join(latexDir, "resume.tex")} from templates/`);
+}
