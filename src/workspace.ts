@@ -119,11 +119,15 @@ export async function seedWorkspace(latexDir: string, templatesDir: string) {
   await mkdir(latexDir, { recursive: true });
   const source = path.join(templatesDir, "workspace");
   for await (const rel of new Bun.Glob("**/*").scan({ cwd: source, dot: true })) {
-    const from = Bun.file(path.join(source, rel));
-    const to = Bun.file(path.join(latexDir, rel));
+    const template = await Bun.file(path.join(source, rel)).text();
+    const dest = path.join(latexDir, rel);
+    // Read via a fresh handle: in Bun 1.4.2, writing to a Bun.file() you've called
+    // .exists() on produces an empty file, so always write by path with explicit contents.
+    const current = await Bun.file(dest).text().catch(() => null);
     const managed = rel.startsWith(".underleaf/");
-    if (managed ? (await to.exists()) && (await to.text()) === (await from.text()) : await to.exists()) continue;
-    await Bun.write(to, from);
+    // An empty file counts as missing: it was never personalized (and repairs bad copies).
+    if (managed ? current === template : current !== null && current.length > 0) continue;
+    await Bun.write(dest, template);
     console.log(`${managed ? "updated" : "added"}   ${rel}`);
   }
 
