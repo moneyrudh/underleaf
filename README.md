@@ -62,7 +62,24 @@ Hidden files (dotfiles) and symlinks are left out of the tree.
 
 ### The Claude pane
 
-It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. If Claude exits, press Enter to start a new one. Toggle the pane with **Claude** in the top bar.
+It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. When underleaf starts, Claude picks up your most recent conversation in `latex/` (`claude --continue`). The command palette has **new conversation** and **resume a previous conversation…** (Claude's own session picker). If Claude exits, press Enter to pick up where you left off. Toggle the pane with **Claude** in the top bar.
+
+#### The resume agent
+
+On startup, underleaf sets up `latex/` as a workspace for a resume-focused agent:
+
+| Path | Owner | Purpose |
+|---|---|---|
+| `CLAUDE.md` | you | Imports the files below. Add your own standing instructions here. |
+| `.underleaf/instructions.md` | underleaf | The agent's role and ground rules (never invent facts, one page, tailored versions in their own folder…). Refreshed on update. |
+| `.underleaf/workspace.md` | underleaf | Live snapshot: every document's compile status, page count, errors, and what's open. Claude re-reads it after edits. |
+| `memory/profile.md`, `memory/experience.yaml`, `memory/applications.md` | Claude & you | Long-term memory: who you are, a structured bank of every role and bullet, and a log of tailored applications. |
+| `.claude/skills/` | Claude & you | `tailor-resume`, `fit-one-page`, `update-memory`. Claude uses them automatically, or you can type `/tailor-resume`. |
+| `.claude/settings.json` | you | Accepts file edits without prompting, and turns off Claude Code's built-in auto memory so `memory/` is the single source. |
+
+Files marked "you" or "Claude & you" are copied in only when missing, so your changes are never overwritten. Everything lives in the git-ignored `latex/`, so it stays private. For history, run `git init` inside `latex/`.
+
+On first use, ask Claude to build your experience bank from your existing resumes.
 
 ### Keyboard
 
@@ -80,7 +97,7 @@ Vim-style keys work when the file tree or preview has focus:
 - **Tree:** `j`/`k`, `h`/`l`, `gg`/`G`, Enter, `a` to mention the file in Claude, `y` to copy its path.
 - **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs.
 
-While Claude has focus, every other key goes to Claude, including Esc to interrupt it.
+While Claude has focus, every other key goes to Claude, including Esc to interrupt it. Shift+Enter inserts a newline, and the macOS editing keys work like they do in Terminal or iTerm2: ⌘⌫ deletes the line, ⌥⌫ deletes a word, ⌘←/→ jumps to the line start or end, ⌥←/→ moves by word.
 
 On macOS, `Ctrl+Space` switches input sources if you have more than one keyboard language enabled. In that case, change or disable that shortcut in System Settings → Keyboard → Keyboard Shortcuts → Input Sources.
 

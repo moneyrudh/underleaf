@@ -4,6 +4,7 @@ import type { ServerWebSocket } from "bun";
 import index from "../public/index.html";
 import { compile, ENGINES, REPO, type CompileResult } from "./compile";
 import { ClaudeSession } from "./claude";
+import { writeBrief } from "./brief";
 import { CONTENT_TYPES, documentsIn, keepWatching, resolveTreePath, scanTree, seedWorkspace, type DirNode } from "./workspace";
 
 // Usage: bun dev [latex-dir] [--resumes dir] [--port 4747] [--no-open]
@@ -79,6 +80,7 @@ async function build(doc: string) {
       }
       s.last = result;
       send(doc, compiledMessage(doc));
+      scheduleBrief();
       const errors = result.diagnostics.filter((d) => d.severity === "error").length;
       console.log(`${result.ok ? "✓" : "✗"} ${relDoc(doc)}  ${result.ms}ms${result.ok ? `  ${result.pages}p` : `  ${errors} error(s)`}`);
     } while (s.queued);
@@ -116,31 +118,62 @@ type WsData = { channel: "app" | "claude"; doc?: string };
 const appClients = new Set<ServerWebSocket<WsData>>();
 const claude = new ClaudeSession(LATEX);
 
+let lastOpened: string | null = null; // most recent document opened in any tab, for Claude's snapshot
+
 function send(doc: string, msg: object) {
   const payload = JSON.stringify(msg);
   for (const ws of appClients) if (ws.data.doc === doc) ws.send(payload);
 }
 
+// ---------- workspace snapshot for Claude ----------
+
+let briefTimer: Timer | undefined;
+function scheduleBrief() {
+  clearTimeout(briefTimer);
+  briefTimer = setTimeout(() => {
+    const results = new Map(docs.map((d) => [d, states.get(d)?.last]));
+    const compiling = new Set(docs.filter((d) => states.get(d)?.compiling));
+    writeBrief(LATEX, { latex: latexTree, resumes: resumesTree, results, compiling, open: lastOpened });
+  }, 150);
+}
+
 // ---------- watching ----------
 
 let pending: Timer | undefined;
-function onFsChange(filename: string) {
-  if (/(^|\/)(node_modules|\.git)(\/|$)/.test(filename)) return;
+const changed = new Set<string>();
+
+/** `treePath` is "latex/…" or "resumes/…" (or just the root key when a root was recreated). */
+function onFsChange(treePath: string) {
+  // Hidden paths (.underleaf/, .claude/, .git/) never affect the tree or a build.
+  if (/(^|\/)(\.[^/]+|node_modules)(\/|$)/.test(treePath)) return;
+  changed.add(treePath);
   clearTimeout(pending);
   // Editors (and Claude) often write a file in several steps; wait for things to settle.
   pending = setTimeout(async () => {
+    const paths = [...changed];
+    changed.clear();
     await rescan();
     const payload = treeMessage();
     for (const ws of appClients) ws.send(payload);
-    const open = new Set([...appClients].map((ws) => ws.data.doc));
-    for (const doc of open) if (doc && docs.includes(doc)) build(doc);
+    // Rebuild what's open (an \input'd fragment may have changed) plus any document
+    // that changed itself, so Claude's snapshot reflects edits to files nobody has open.
+    const targets = new Set([...appClients].map((ws) => ws.data.doc).filter((d): d is string => !!d));
+    for (const p of paths) if (docs.includes(p)) targets.add(p);
+    for (const doc of targets) if (docs.includes(doc)) build(doc);
+    scheduleBrief();
   }, 120);
 }
 
-await keepWatching(LATEX, onFsChange);
 await seedWorkspace(LATEX, path.join(REPO, "templates"));
-await keepWatching(RESUMES, onFsChange);
+await keepWatching(LATEX, (f) => onFsChange(f ? `latex/${f}` : "latex"));
+await keepWatching(RESUMES, (f) => onFsChange(f ? `resumes/${f}` : "resumes"));
 await rescan();
+scheduleBrief();
+
+// Compile everything once in the background so Claude starts with real page counts.
+(async () => {
+  for (const doc of docs) await build(doc);
+})();
 
 // ---------- http ----------
 
@@ -230,11 +263,13 @@ const server = Bun.serve<WsData>({
       if (ws.data.channel === "claude") {
         if (msg.type === "input") claude.input(String(msg.data));
         else if (msg.type === "resize") claude.resize(Number(msg.cols), Number(msg.rows));
-        else if (msg.type === "restart") claude.restart();
+        else if (msg.type === "restart") claude.restart(["continue", "new", "resume"].includes(msg.start) ? msg.start : "new");
         return;
       }
       if (msg.type === "open" && docs.includes(msg.doc)) {
         ws.data.doc = msg.doc;
+        lastOpened = msg.doc;
+        scheduleBrief();
         if (stateOf(msg.doc).last) ws.send(JSON.stringify(compiledMessage(msg.doc)));
         build(msg.doc); // the file may have changed while nobody was looking at it
       } else if (msg.type === "close") {

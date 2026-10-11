@@ -1,0 +1,8 @@
+# Experience bank: every true fact about your work, more than fits on one page.
+# Claude builds this from your resumes, reads it when tailoring, and keeps it current.
+# Edit freely. See .claude/skills/update-memory/SKILL.md for the shape.
+
+roles: []
+projects: []
+education: []
+skills: {}

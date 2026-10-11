@@ -1,6 +1,6 @@
 import type { DirNode, FileNode } from "../src/workspace";
 import { FileTree } from "./tree";
-import { ClaudeTerminal } from "./terminal";
+import { ClaudeTerminal, type ClaudeStart } from "./terminal";
 import * as preview from "./preview";
 import { closePalette, openPalette, paletteOpen } from "./palette";
 import { installKeymap, label, LEADER, type Bindings } from "./keys";
@@ -312,6 +312,12 @@ for (const splitter of document.querySelectorAll<HTMLElement>(".splitter")) {
 
 // ---------- commands & keys ----------
 
+function restartClaude(start: ClaudeStart) {
+  setPaneVisible("claude", true);
+  claude.restart(start);
+  markFocused("claude");
+}
+
 type Command = { title: string; keys?: string; run: () => void; when?: () => boolean; group?: string };
 const isDoc = () => selected?.kind === "doc";
 
@@ -339,7 +345,9 @@ const COMMANDS: Command[] = [
   { title: "Zoom in", keys: "+", run: () => preview.stepZoom(1) },
   { title: "Zoom out", keys: "-", run: () => preview.stepZoom(-1) },
   { title: "Fit to width", keys: "=", run: preview.fitWidth },
-  { title: "Restart Claude session", run: () => (setPaneVisible("claude", true), claude.restart()) },
+  { title: "Claude: new conversation", run: () => restartClaude("new") },
+  { title: "Claude: resume a previous conversation…", run: () => restartClaude("resume") },
+  { title: "Claude: continue the most recent conversation", run: () => restartClaude("continue") },
   { title: "Keyboard shortcuts", keys: "?", run: toggleCheatsheet },
 ];
 

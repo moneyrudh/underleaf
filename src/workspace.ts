@@ -108,10 +108,26 @@ export function keepWatching(dir: string, onChange: (filename: string) => void) 
   return start();
 }
 
-/** First run: give an empty workspace a starting document from templates/. */
+/**
+ * Install the agent setup from templates/ into the workspace.
+ * - `.underleaf/` is owned by underleaf: refreshed whenever the template changes.
+ * - Everything else (CLAUDE.md, memory, skills, settings) is copied only if missing,
+ *   because the user and Claude personalize those files.
+ * - An empty workspace also gets a starter resume.tex.
+ */
 export async function seedWorkspace(latexDir: string, templatesDir: string) {
-  for await (const _ of new Bun.Glob("**/*.tex").scan({ cwd: latexDir })) return;
   await mkdir(latexDir, { recursive: true });
+  const source = path.join(templatesDir, "workspace");
+  for await (const rel of new Bun.Glob("**/*").scan({ cwd: source, dot: true })) {
+    const from = Bun.file(path.join(source, rel));
+    const to = Bun.file(path.join(latexDir, rel));
+    const managed = rel.startsWith(".underleaf/");
+    if (managed ? (await to.exists()) && (await to.text()) === (await from.text()) : await to.exists()) continue;
+    await Bun.write(to, from);
+    console.log(`${managed ? "updated" : "added"}   ${rel}`);
+  }
+
+  for await (const _ of new Bun.Glob("**/*.tex").scan({ cwd: latexDir })) return;
   await Bun.write(path.join(latexDir, "resume.tex"), Bun.file(path.join(templatesDir, "resume.tex")));
-  console.log(`seeded   ${path.join(latexDir, "resume.tex")} from templates/`);
+  console.log(`added   resume.tex (starter template)`);
 }
