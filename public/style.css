@@ -170,6 +170,8 @@ button:hover, .pane-head a:hover { background: #33433a; }
 .viewer { flex: 1; overflow: auto; padding: 24px; color: var(--panel-fg); }
 .pages { display: flex; flex-direction: column; align-items: center; gap: 16px; width: max-content; min-width: 100%; }
 .page { display: block; background: white; box-shadow: 0 1px 3px rgb(0 0 0 / 0.18), 0 6px 20px rgb(0 0 0 / 0.08); }
+.viewer > * { transition: opacity 150ms ease-out; }
+.viewer.loading > * { opacity: 0.45; } /* switching files/versions: dim until the next view is ready */
 .viewer .pages { transition: opacity 180ms ease-out; }
 .viewer.stale .pages { opacity: 0.55; }
 .viewer img.image { display: block; margin: 0 auto; max-width: 100%; background: white; box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); }

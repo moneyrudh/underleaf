@@ -24,11 +24,37 @@ export function setStatus(text: string, kind: "ok" | "busy" | "fail" | "info" | 
   body.classList.toggle("busy", kind === "busy");
 }
 
+// No flashes: what's on screen stays until the next view is completely ready, then
+// swaps in one step at full opacity. Switching files or versions dims the old view
+// meanwhile; live rebuilds (you or Claude editing) don't dim at all.
+let keepScrollOnSwap = true;
+
+/** Dim the current view until the next one is ready. A different file starts at the top. */
+export function beginLoading({ keepScroll }: { keepScroll: boolean }) {
+  keepScrollOnSwap = keepScroll;
+  viewer.classList.add("loading");
+}
+
+/** Whether anything worth keeping (a page, source, image) is on screen. */
+export function hasContent() {
+  return viewer.querySelector(".pages, pre.source, img.image") !== null;
+}
+
+/** Replace the view in one step, keeping the scroll position when it's the same file. */
+function swap(el: HTMLElement) {
+  const { scrollTop, scrollLeft } = viewer;
+  viewer.classList.remove("loading");
+  viewer.replaceChildren(el);
+  viewer.scrollTop = keepScrollOnSwap ? scrollTop : 0;
+  viewer.scrollLeft = keepScrollOnSwap ? scrollLeft : 0;
+  keepScrollOnSwap = true;
+}
+
 /** Show a PDF; re-renders only when the URL changes (it carries a version). */
 export function showPdf(url: string, { stale = false } = {}) {
   viewer.classList.toggle("stale", stale);
   body.classList.toggle("stale", stale);
-  if (url === currentPdf) return;
+  if (url === currentPdf) return void viewer.classList.remove("loading");
   currentPdf = url;
   render();
 }
@@ -38,7 +64,7 @@ export function showMessage(html: string) {
   const p = document.createElement("p");
   p.className = "message";
   p.innerHTML = html;
-  viewer.replaceChildren(p);
+  swap(p);
 }
 
 export async function showText(url: string) {
@@ -49,17 +75,17 @@ export async function showText(url: string) {
   const pre = document.createElement("pre");
   pre.className = "source";
   pre.textContent = text;
-  const { scrollTop } = viewer;
-  viewer.replaceChildren(pre);
-  viewer.scrollTop = scrollTop;
+  swap(pre);
 }
 
-export function showImage(url: string) {
+export async function showImage(url: string) {
   reset();
+  const token = renderToken;
   const img = document.createElement("img");
   img.className = "image";
   img.src = url;
-  viewer.replaceChildren(img);
+  await img.decode().catch(() => {}); // swap once it can paint, not as an empty box
+  if (token === renderToken) swap(img);
 }
 
 function reset() {
@@ -97,12 +123,7 @@ async function render() {
       pagesEl.append(canvas);
     }
 
-    const { scrollTop, scrollLeft } = viewer;
-    const rebuild = viewer.querySelector(".pages") !== null;
-    viewer.replaceChildren(pagesEl);
-    viewer.scrollTop = scrollTop;
-    viewer.scrollLeft = scrollLeft;
-    if (rebuild && !reduceMotion.matches) pagesEl.animate([{ opacity: 0.7 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
+    swap(pagesEl);
   } catch (err) {
     if (token === renderToken) showMessage(`Couldn't render this PDF.<br><small>${String(err).replace(/</g, "&lt;")}</small>`);
   } finally {
@@ -146,7 +167,12 @@ export function scroll(how: "down" | "up" | "half-down" | "half-up" | "top" | "b
   viewer.scrollBy({ top: by, behavior: how.startsWith("half") ? behavior : "instant" });
 }
 
+// Pages are fitted to the width, so only a width change needs a re-render. Height changes
+// (the version banner appearing, for example) would otherwise re-render the same page.
+let fittedWidth = viewer.clientWidth;
 new ResizeObserver(() => {
+  if (viewer.clientWidth === fittedWidth) return;
+  fittedWidth = viewer.clientWidth;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(refit, 150);
 }).observe(viewer);

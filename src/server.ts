@@ -51,12 +51,16 @@ type DocState = {
   version: number; // bumps on every successful build, used to bust the PDF cache
   compiling: boolean;
   queued: boolean;
+  builtAt: number; // when the latest build started (its inputs were read at or after this)
 };
+
+// Last time anything in latex/ changed. A build that started after it is still current.
+let latexChangedAt = Date.now();
 
 const states = new Map<string, DocState>();
 const stateOf = (doc: string) => {
   let s = states.get(doc);
-  if (!s) states.set(doc, (s = { version: 0, compiling: false, queued: false }));
+  if (!s) states.set(doc, (s = { version: 0, compiling: false, queued: false, builtAt: 0 }));
   return s;
 };
 const relDoc = (doc: string) => doc.slice("latex/".length);
@@ -75,6 +79,7 @@ async function build(doc: string) {
     do {
       s.queued = false;
       send(doc, { type: "compiling", doc });
+      s.builtAt = Date.now();
       const result = await compile(path.join(LATEX, relDoc(doc)), outDirOf(doc));
       if (result.ok) {
         await copyFile(result.pdfPath, goodPdfOf(doc));
@@ -243,7 +248,10 @@ function onFsChange(treePath: string) {
   // Hidden paths (.underleaf/, .claude/, .git/) never affect the tree or a build.
   if (/(^|\/)(\.[^/]+|node_modules)(\/|$)/.test(treePath)) return;
   changed.add(treePath);
-  if (treePath.startsWith("latex/")) scheduleEditSnapshot();
+  if (treePath.startsWith("latex/")) {
+    latexChangedAt = Date.now();
+    scheduleEditSnapshot();
+  }
   clearTimeout(pending);
   // Editors (and Claude) often write a file in several steps; wait for things to settle.
   pending = setTimeout(async () => {
@@ -441,8 +449,11 @@ const server = Bun.serve<WsData>({
         ws.data.doc = msg.doc;
         lastOpened = msg.doc;
         scheduleBrief();
-        if (stateOf(msg.doc).last) ws.send(JSON.stringify(compiledMessage(msg.doc)));
-        build(msg.doc); // the file may have changed while nobody was looking at it
+        const s = stateOf(msg.doc);
+        if (s.last) ws.send(JSON.stringify(compiledMessage(msg.doc)));
+        // Rebuild only if something changed since the last build: an identical rebuild would
+        // re-render the same PDF (a second flash) for nothing.
+        if (!s.last || s.builtAt <= latexChangedAt) build(msg.doc); // a running build reports to this tab anyway
       } else if (msg.type === "close") {
         ws.data.doc = undefined;
       }

@@ -127,7 +127,10 @@ function onTree(trees: DirNode[]) {
 
 function open(file: FileNode) {
   const switching = file.path !== selected?.path;
+  const leavingSnapshot = !!versions.viewing;
   leaveSnapshot();
+  // Keep what's on screen (dimmed) until the next view is ready, instead of blanking it.
+  if ((switching || leavingSnapshot) && preview.hasContent()) preview.beginLoading({ keepScroll: !switching });
   selected = file;
   versions.setFile(file.path, historyEnabled);
   tree.setOpened(file.path);
@@ -151,7 +154,7 @@ function open(file: FileNode) {
       lastPdf = null;
       exportButton.disabled = true;
       preview.setStatus("compiling…", "busy");
-      preview.showMessage("Compiling…");
+      if (!preview.hasContent()) preview.showMessage("Compiling…"); // nothing to keep on screen meanwhile
     }
     send({ type: "open", doc: file.path });
     return;
@@ -201,6 +204,7 @@ function leaveSnapshot() {
 async function viewSnapshot(snap: Snapshot) {
   if (!selected || !snap.path) return;
   versions.showViewing(snap);
+  if (preview.hasContent()) preview.beginLoading({ keepScroll: true }); // same file: keep your place
   exportButton.hidden = download.hidden = true;
   const where = `${snap.label} · ${relativeTime(snap.time)}`;
   const query = `commit=${snap.id}&path=${encodeURIComponent(snap.path)}`;
