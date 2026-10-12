@@ -81,6 +81,8 @@ Files marked "you" or "Claude & you" are copied in only when missing, so your ch
 
 On first use, ask Claude to build your experience bank from your existing resumes.
 
+`CLAUDE.md` and `memory/` are hidden from the file tree by default. Run **Show agent memory** from the command palette (⌘⇧P) to see or edit what Claude remembers.
+
 ### Keyboard
 
 Press `?` (or the **?** button) for the full list. The essentials:

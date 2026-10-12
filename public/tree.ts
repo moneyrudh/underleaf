@@ -8,6 +8,10 @@ const ICONS = {
 };
 const FLASH_MS = 1600;
 
+/** Files the resume agent owns. Hidden by default so the tree stays about your documents. */
+export const isAgentPath = (path: string) =>
+  path === "latex/CLAUDE.md" || path === "latex/memory" || path.startsWith("latex/memory/");
+
 type Handlers = { onOpen: (file: FileNode) => void };
 
 /**
@@ -21,6 +25,7 @@ export class FileTree {
   private visible: string[] = []; // row paths in display order, for j/k
   private mtimes = new Map<string, number>();
   private changedAt = new Map<string, number>();
+  private showAgent = storage("show-agent-files") === "1";
   opened: string | null = null;
   cursor: string | null = null;
 
@@ -50,8 +55,27 @@ export class FileTree {
     return node?.type === "file" ? node : undefined;
   }
 
+  /** Files currently listed in the tree (agent files only when shown). Used by quick-open too. */
   files(): FileNode[] {
-    return [...this.nodes.values()].filter((n): n is FileNode => n.type === "file");
+    return [...this.nodes.values()].filter((n): n is FileNode => n.type === "file" && this.listed(n.path));
+  }
+
+  get agentFilesVisible() {
+    return this.showAgent;
+  }
+
+  setAgentFilesVisible(visible: boolean) {
+    this.showAgent = visible;
+    storage("show-agent-files", visible ? "1" : "0");
+    if (visible) {
+      this.expanded.add("latex/memory");
+      storage("expanded", JSON.stringify([...this.expanded]));
+    }
+    this.render();
+  }
+
+  private listed(path: string) {
+    return this.showAgent || !isAgentPath(path);
   }
 
   firstDocument(): FileNode | undefined {
@@ -159,10 +183,11 @@ export class FileTree {
     wrap.append(row);
     if (!open) return wrap;
 
-    for (const child of dir.children) {
+    const children = dir.children.filter((c) => this.listed(c.path));
+    for (const child of children) {
       wrap.append(child.type === "dir" ? this.renderDir(child, depth + 1) : this.renderFile(child, depth + 1));
     }
-    if (root && dir.children.length === 0) {
+    if (root && children.length === 0) {
       const hint = document.createElement("div");
       hint.className = "empty-hint";
       hint.textContent = dir.path === "latex" ? "Empty. Add .tex files here, or ask Claude to." : "Saved PDFs will appear here.";

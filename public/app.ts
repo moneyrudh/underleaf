@@ -312,6 +312,12 @@ for (const splitter of document.querySelectorAll<HTMLElement>(".splitter")) {
 
 // ---------- commands & keys ----------
 
+function toggleAgentFiles(visible: boolean) {
+  tree.setAgentFilesVisible(visible);
+  toast(visible ? "Agent memory shown in Files (CLAUDE.md, memory/)" : "Agent memory hidden");
+  if (visible) focusPane("tree");
+}
+
 function restartClaude(start: ClaudeStart) {
   setPaneVisible("claude", true);
   claude.restart(start);
@@ -327,6 +333,8 @@ const COMMANDS: Command[] = [
   { title: "Download PDF", run: () => download.click(), when: () => !download.hidden },
   { title: "Mention open file in Claude", run: () => mention(selected ?? undefined), when: () => !!selected },
   { title: "Copy path of open file", run: () => copyPath(selected ?? undefined), when: () => !!selected },
+  { title: "Show agent memory", run: () => toggleAgentFiles(true), when: () => !tree.agentFilesVisible },
+  { title: "Hide agent memory", run: () => toggleAgentFiles(false), when: () => tree.agentFilesVisible },
   {
     title: "Reveal open file in tree",
     run: () => {
