@@ -22,6 +22,13 @@ Local, Overleaf-style LaTeX workspace in the browser: file tree | embedded Claud
 - `public/` — `app.ts` (state, focus/`data-focused`, commands registry, cheat sheet, layout/splitters), `tree.ts` (cursor ≠ opened file; changed-file flash), `preview.ts` (pdf.js v6: `getDocument({url})`, `render({canvas, viewport})`, destroy via loading task; off-screen render then swap), `terminal.ts` (xterm.js + fit addon).
 - `build/`, `latex/`, `resumes/` are git-ignored. `examples/` holds committed demo docs. `templates/` is committed and copied into the workspace when missing (`seedWorkspace`: `resume.tex` when `latex/` has no .tex). Anything the in-app agent may personalize (its CLAUDE.md, memory, skills) must ship from `templates/` this way, never be tracked inside `latex/`.
 
+## Version history
+
+- `src/history.ts`: `HistoryStore` = plain git with `--git-dir=~/.underleaf/history/<id>.git --work-tree=latex/` (`UNDERLEAF_HOME` overrides the root). Workspace id lives in `latex/.underleaf/id` so history survives moving the folder. Snapshot kind/author live in commit trailers (`Underleaf-Kind`, `Underleaf-Path`); authors are `You`/`Claude`/`underleaf`. All git ops are serialized (index.lock). `log()` = `--follow -M` for the file plus exports grepped by exact `Underleaf-Path`, ordered by `rev-list` rank (git times are 1s resolution).
+- Triggers (server.ts): edit debounce `EDIT_IDLE_MS` (skipped while a Claude turn is active), Claude `Stop` hook, export (empty commit). Restore snapshots the current state first.
+- Claude hooks: `ensureClaudeHooks` merges two `http` hooks (UserPromptSubmit → `?event=prompt`, Stop → `?event=stop`) into `latex/.claude/settings.json` on every start (URL can't interpolate env, so the port is written in). Auth = per-run `UNDERLEAF_HOOK_TOKEN` header passed via `allowedEnvVars`; respond 204 with an empty body (UserPromptSubmit output would be added to Claude's context).
+- Past versions compile into `build/<ws>/.history/<commit>/` from `git archive | tar`; `/api/history/pdf` caches per (commit, doc).
+
 ## Rules
 
 - **Never commit anything from `latex/` or `resumes/`.** The remote (`github.com/moneyrudh/underleaf`) is public and the author's resumes live there locally.
@@ -35,3 +42,13 @@ Local, Overleaf-style LaTeX workspace in the browser: file tree | embedded Claud
 - Server builds every document once at startup, then on change rebuilds open docs + any document that itself changed, so the snapshot covers files nobody has open. Hidden paths (`.underleaf/`, `.claude/`) are ignored by the watcher.
 - The workspace settings disable Claude Code auto memory: `latex/` is inside this repo, and auto memory is keyed per git repo, so it would otherwise be shared with dev sessions here.
 - The agent also reads this file (parent directory). Its instructions treat it as background only; keep anything the agent needs in `templates/workspace/`, since binary users won't have this repo.
+
+## Roadmap
+
+1. ~~Hide agent files in the tree ("Show agent memory")~~
+2. ~~Version history (snapshots, timeline strip, History panel, restore)~~
+3. **Diff view**: "what the reader sees" (word diff of text extracted from each version's PDF) by default, LaTeX source diff as a toggle. Entry points: Compare in History/banner, and "Compare two files…".
+4. **PDF → source**: compile with SyncTeX; clicking the preview inserts `@file.tex:LINE ` into Claude's prompt.
+5. **Source editor**: a source view beside/instead of the PDF (CodeMirror) for manual edits; saving writes the file, which the watcher turns into a normal "You edited" snapshot.
+6. **Distribution**: `bun build --compile` binaries (macOS/Windows/Linux), opening in a Chrome/Edge `--app` window. Revisit git (Windows) and hook shells before shipping.
+

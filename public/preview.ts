@@ -155,7 +155,9 @@ let resizeTimer: ReturnType<typeof setTimeout>;
 // ---------- logs ----------
 
 export function toggleLogs() {
-  if (!logsButton.hidden) logs.hidden = !logs.hidden;
+  if (logsButton.hidden) return;
+  logs.hidden = !logs.hidden;
+  if (!logs.hidden) $("history").hidden = true; // one side panel at a time
 }
 logsButton.onclick = toggleLogs;
 

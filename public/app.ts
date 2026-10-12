@@ -1,4 +1,6 @@
 import type { DirNode, FileNode } from "../src/workspace";
+import type { Snapshot } from "../src/history";
+import { HistoryPanel, relativeTime } from "./history";
 import { FileTree } from "./tree";
 import { ClaudeTerminal, type ClaudeStart } from "./terminal";
 import * as preview from "./preview";
@@ -7,7 +9,8 @@ import { installKeymap, label, LEADER, type Bindings } from "./keys";
 import { $, formatBytes, storage, toast } from "./util";
 
 type Message =
-  | { type: "tree"; trees: DirNode[]; docs: string[]; roots: Record<string, string> }
+  | { type: "tree"; trees: DirNode[]; docs: string[]; roots: Record<string, string>; history: boolean }
+  | { type: "history" }
   | { type: "compiling"; doc: string }
   | {
       type: "compiled";
@@ -28,6 +31,8 @@ const cheatsheet = $("cheatsheet");
 
 let ws: WebSocket;
 let selected: FileNode | null = null;
+let historyEnabled = false;
+let snapshotPdfUrl: string | null = null; // object URL of the earlier version being viewed
 let lastPdf: string | null = null; // latest good PDF of the selected document
 let roots: Record<string, string> = {};
 let firstTree = true;
@@ -54,11 +59,20 @@ function connect() {
 function handle(msg: Message) {
   if (msg.type === "tree") {
     roots = msg.roots;
-    return onTree(msg.trees);
+    historyEnabled = msg.history;
+    onTree(msg.trees);
+    versions.setFile(selected?.path ?? null, historyEnabled);
+    return;
   }
+  if (msg.type === "history") return void versions.refresh();
   if (!selected || msg.doc !== selected.path) return;
 
-  if (msg.type === "compiling") return preview.setStatus("compiling…", "busy");
+  // While an earlier version is on screen, keep tracking the live build but don't replace the view.
+  if (msg.type === "compiling") return versions.viewing ? undefined : preview.setStatus("compiling…", "busy");
+  if (versions.viewing) {
+    lastPdf = msg.pdf;
+    return;
+  }
 
   const errors = msg.diagnostics.filter((d) => d.severity === "error").length;
   if (msg.ok) {
@@ -102,6 +116,8 @@ function onTree(trees: DirNode[]) {
     selected = null;
     tree.setOpened(null);
     showNothing();
+  } else if (versions.viewing) {
+    selected = now; // looking at an earlier version: the live file refreshes when you go back
   } else if (now.kind !== selected.kind || (now.kind !== "doc" && now.mtime !== selected.mtime)) {
     open(now); // changed on disk → refresh the preview (docs refresh via compile messages)
   } else {
@@ -111,7 +127,9 @@ function onTree(trees: DirNode[]) {
 
 function open(file: FileNode) {
   const switching = file.path !== selected?.path;
+  leaveSnapshot();
   selected = file;
+  versions.setFile(file.path, historyEnabled);
   tree.setOpened(file.path);
   history.replaceState(null, "", `#${encodeURIComponent(file.path)}`);
   storage("selected", file.path);
@@ -152,6 +170,8 @@ function open(file: FileNode) {
 }
 
 function showNothing() {
+  leaveSnapshot();
+  versions.setFile(null, historyEnabled);
   title.textContent = "Preview";
   exportButton.hidden = download.hidden = zoomGroup.hidden = true;
   preview.showLogsButton(false);
@@ -163,6 +183,70 @@ window.addEventListener("hashchange", () => {
   const file = tree.find(decodeURIComponent(location.hash.slice(1)));
   if (file && file.path !== selected?.path) open(file);
 });
+
+// ---------- version history ----------
+
+const versions = new HistoryPanel({
+  onView: (snap) => viewSnapshot(snap),
+  onCurrent: () => selected && open(selected),
+  onRestore: (snap) => restoreSnapshot(snap),
+});
+
+function leaveSnapshot() {
+  if (versions.viewing) versions.showViewing(null);
+  if (snapshotPdfUrl) URL.revokeObjectURL(snapshotPdfUrl);
+  snapshotPdfUrl = null;
+}
+
+async function viewSnapshot(snap: Snapshot) {
+  if (!selected || !snap.path) return;
+  versions.showViewing(snap);
+  exportButton.hidden = download.hidden = true;
+  const where = `${snap.label} · ${relativeTime(snap.time)}`;
+  const query = `commit=${snap.id}&path=${encodeURIComponent(snap.path)}`;
+
+  if (selected.kind === "doc" && snap.path.endsWith(".tex")) {
+    preview.setStatus("compiling this version…", "busy");
+    const res = await fetch(`/api/history/pdf?${query}`).catch(() => null);
+    if (versions.viewing?.id !== snap.id) return; // moved on while it compiled
+    if (!res?.ok) {
+      const body = (await res?.json().catch(() => null)) as { diagnostics?: preview.Diagnostic[] } | null;
+      preview.showDiagnostics(body?.diagnostics ?? []);
+      preview.showMessage("This version doesn't compile. Its errors are in <strong>Logs</strong>.");
+      preview.setStatus(where, "fail");
+      return;
+    }
+    if (snapshotPdfUrl) URL.revokeObjectURL(snapshotPdfUrl);
+    snapshotPdfUrl = URL.createObjectURL(await res.blob());
+    preview.showPdf(snapshotPdfUrl);
+  } else if (selected.kind === "pdf") {
+    preview.showPdf(`/api/history/file?${query}`);
+  } else if (selected.kind === "image") {
+    preview.showImage(`/api/history/file?${query}`);
+  } else {
+    preview.showText(`/api/history/file?${query}`);
+  }
+  preview.setStatus(where, "info");
+}
+
+async function restoreSnapshot(snap: Snapshot) {
+  if (!selected) return;
+  const res = await fetch("/api/history/restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commit: snap.id, path: snap.path, target: selected.path }),
+  }).catch(() => null);
+  if (!res?.ok) return toast("Couldn't restore that version");
+  const { changed } = (await res.json()) as { changed: boolean };
+  toast(
+    !changed
+      ? `${selected.name} already matches this version. Nothing to restore.`
+      : snap.kind === "export"
+        ? `Restored ${selected.name} to the exported version. The version you replaced is saved in history.`
+        : `Restored ${selected.name}. The version you replaced is saved in history.`,
+  );
+  open(selected);
+}
 
 // ---------- actions ----------
 
@@ -273,6 +357,7 @@ function setPaneVisible(name: PaneName, visible: boolean) {
   const pane = PANES[name];
   const splitter = pane.nextElementSibling as HTMLElement;
   pane.hidden = splitter.hidden = !visible;
+  if (name === "tree") $("tree-rail").hidden = visible; // collapsed files leave a slim rail to reopen them
   TOGGLES[name]?.classList.toggle("on", visible);
   storage(pane.id, visible ? "1" : "0");
   if (visible && name === "claude") claude.focus();
@@ -281,6 +366,8 @@ function setPaneVisible(name: PaneName, visible: boolean) {
 const togglePane = (name: PaneName) => setPaneVisible(name, PANES[name].hidden !== false);
 
 $("toggle-tree").onclick = () => togglePane("tree");
+$("collapse-tree").onclick = () => setPaneVisible("tree", false);
+$("expand-tree").onclick = () => focusPane("tree");
 $("toggle-claude").onclick = () => togglePane("claude");
 setPaneVisible("tree", storage("tree-pane") !== "0");
 setPaneVisible("claude", storage("claude-pane") !== "0");
@@ -350,6 +437,11 @@ const COMMANDS: Command[] = [
   { title: "Toggle file tree", run: () => togglePane("tree") },
   { title: "Toggle Claude", run: () => togglePane("claude") },
   { title: "Toggle logs", keys: "L", run: preview.toggleLogs, when: isDoc },
+  { title: "Version history", keys: "H", run: () => versions.toggle(), when: () => historyEnabled && !!selected?.path.startsWith("latex/") },
+  { title: "Back to current version", run: () => selected && open(selected), when: () => !!versions.viewing },
+  { title: "Toggle version bar", keys: "V", run: () => versions.toggleStrip(), when: () => historyEnabled },
+  { title: "Older version", keys: ",", run: () => versions.step(-1), when: () => historyEnabled },
+  { title: "Newer version", keys: ".", run: () => versions.step(1), when: () => historyEnabled },
   { title: "Zoom in", keys: "+", run: () => preview.stepZoom(1) },
   { title: "Zoom out", keys: "-", run: () => preview.stepZoom(-1) },
   { title: "Fit to width", keys: "=", run: preview.fitWidth },
@@ -388,6 +480,10 @@ const PREVIEW_KEYS: Bindings = {
   "-": () => preview.stepZoom(-1),
   "=": preview.fitWidth,
   L: preview.toggleLogs,
+  H: () => versions.toggle(),
+  V: () => versions.toggleStrip(),
+  ",": () => versions.step(-1),
+  ".": () => versions.step(1),
   "] e": () => preview.cycleDiagnostic(1),
   "[ e": () => preview.cycleDiagnostic(-1),
   a: () => mention(selected ?? undefined),
@@ -477,6 +573,9 @@ function renderCheatsheet() {
         ["+", "Zoom in (-: out, =: fit)"],
         ["] e", "Next error ([ e: previous)"],
         ["L", "Toggle logs"],
+        ["H", "Version history"],
+        [",", "Older version (.: newer)"],
+        ["V", "Toggle version bar"],
         ["a", "Mention file in Claude"],
       ],
     ],

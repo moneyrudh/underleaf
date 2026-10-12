@@ -83,6 +83,20 @@ On first use, ask Claude to build your experience bank from your existing resume
 
 `CLAUDE.md` and `memory/` are hidden from the file tree by default. Run **Show agent memory** from the command palette (⌘⇧P) to see or edit what Claude remembers.
 
+### Version history
+
+underleaf snapshots `latex/` automatically, so you can look back at any earlier version of a file and restore it:
+
+| When | Snapshot label |
+|---|---|
+| You pause editing for ~10 seconds | "You edited main.tex" |
+| Claude finishes a turn that changed files | "Claude: *your prompt*" |
+| You press **Save PDF** | "Exported resumes/…" (so every PDF you sent maps to its exact source) |
+
+The **version bar** above the preview is a timeline of the open file: oldest on the left, **Now** on the right. Hover a dot for its label, click it to open that version, or step through with `,` (older) and `.` (newer). Press `V` to hide or show the bar. For the full list with labels, open **History** in the preview toolbar (or press `H`). Click a snapshot to preview that version (documents are compiled as they were). **Restore this version** puts it back, and the version it replaces is saved first, so a restore can be undone too. History follows renames.
+
+History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
+
 ### Keyboard
 
 Press `?` (or the **?** button) for the full list. The essentials:
@@ -95,9 +109,11 @@ Press `?` (or the **?** button) for the full list. The essentials:
 | `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
 | `Ctrl+Space` then `z` | Zoom the focused pane |
 
+The `‹` in the Files header collapses the file tree to a slim rail; `›` brings it back.
+
 Vim-style keys work when the file tree or preview has focus:
 - **Tree:** `j`/`k`, `h`/`l`, `gg`/`G`, Enter, `a` to mention the file in Claude, `y` to copy its path.
-- **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs.
+- **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs, `H` for history, `,`/`.` for older/newer versions, `V` for the version bar.
 
 While Claude has focus, every other key goes to Claude, including Esc to interrupt it. Shift+Enter inserts a newline, and the macOS editing keys work like they do in Terminal or iTerm2: ⌘⌫ deletes the line, ⌥⌫ deletes a word, ⌘←/→ jumps to the line start or end, ⌥←/→ moves by word.
 

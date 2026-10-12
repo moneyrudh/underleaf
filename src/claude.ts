@@ -24,7 +24,12 @@ export class ClaudeSession {
   private rows = 30;
   private sized = false; // the browser has reported the pane's real size
 
-  constructor(private cwd: string) {}
+  constructor(
+    private cwd: string,
+    private extraEnv: Record<string, string> = {},
+    /** Called whenever the `claude` process exits or is replaced. */
+    private onExit: () => void = () => {},
+  ) {}
 
   attach(ws: ServerWebSocket<unknown>) {
     this.clients.add(ws);
@@ -80,7 +85,7 @@ export class ClaudeSession {
     }
     await this.warnIfConfigUnreadable();
 
-    const env: Record<string, string | undefined> = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" };
+    const env: Record<string, string | undefined> = { ...process.env, ...this.extraEnv, TERM: "xterm-256color", COLORTERM: "truecolor" };
     delete env.CLAUDECODE; // underleaf may itself be launched from inside a Claude Code session
 
     const startedAt = performance.now();
@@ -91,6 +96,7 @@ export class ClaudeSession {
     });
     this.proc = proc;
     proc.exited.then((code) => {
+      this.onExit();
       if (this.proc !== proc) return;
       this.proc = undefined;
       proc.terminal?.close();

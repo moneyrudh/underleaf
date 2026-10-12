@@ -22,8 +22,15 @@
     </header>
 
     <main id="workspace" class="workspace">
+      <div id="tree-rail" class="tree-rail" hidden>
+        <button id="expand-tree" class="rail-button" title="Show files"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
+      </div>
       <nav id="tree-pane" class="pane tree-pane" tabindex="0" aria-label="Files">
-        <div class="pane-head"><span class="pane-title">Files</span></div>
+        <div class="pane-head">
+          <span class="pane-title">Files</span>
+          <span class="spacer"></span>
+          <button id="collapse-tree" class="rail-button" title="Hide files"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+        </div>
         <div id="tree" class="tree" role="tree"></div>
       </nav>
       <div class="splitter" data-pane="tree-pane" data-var="--tree-w"></div>
@@ -47,13 +54,34 @@
             <button id="zoom-fit" title="Fit width (=)">Fit</button>
             <button id="zoom-in" title="Zoom in (+)">+</button>
           </div>
+          <button id="toggle-history" class="ghost" hidden title="Version history (H)">History</button>
           <button id="toggle-logs" class="ghost" hidden title="Logs (L)">Logs</button>
           <button id="export" class="primary" hidden title="Save the PDF into resumes/">Save PDF</button>
           <a id="download" class="ghost icon" hidden title="Download">⤓</a>
         </div>
+        <div id="version-strip" class="version-strip" hidden>
+          <span class="strip-title">Versions</span>
+          <div class="strip-scroll"><ol id="version-track" class="version-track"></ol></div>
+          <button id="hide-strip" class="rail-button" title="Hide version bar (V)">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+          <div id="version-tip" class="version-tip" hidden></div>
+        </div>
         <div id="preview-body" class="preview-body">
-          <div id="viewer" class="viewer"></div>
+          <div class="viewer-col">
+            <div id="snapshot-banner" class="snapshot-banner" hidden>
+              <span class="snapshot-what"></span>
+              <span class="spacer"></span>
+              <button id="snapshot-restore" class="ghost">Restore this version</button>
+              <button id="snapshot-back" class="primary">Back to current</button>
+            </div>
+            <div id="viewer" class="viewer"></div>
+          </div>
           <aside id="logs" class="logs" hidden><ul id="diagnostics"></ul></aside>
+          <aside id="history" class="history" hidden>
+            <div class="history-head">Version history</div>
+            <ul id="history-list"></ul>
+          </aside>
         </div>
       </section>
     </main>
