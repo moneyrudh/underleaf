@@ -1,10 +1,11 @@
 import type { Snapshot } from "../src/history";
 import { $, storage } from "./util";
 
-const KIND_ICONS: Record<Snapshot["kind"], string> = { claude: "✦", edit: "✎", export: "⤓", restore: "↺", init: "•" };
+export const KIND_ICONS: Record<Snapshot["kind"], string> = { claude: "✦", edit: "✎", export: "⤓", restore: "↺", init: "•" };
 
 type Handlers = {
   onView: (snap: Snapshot) => void;
+  onCompare: (snap: Snapshot) => void;
   onCurrent: () => void;
   onRestore: (snap: Snapshot) => Promise<void>;
 };
@@ -23,6 +24,7 @@ export class HistoryPanel {
   private banner = $("snapshot-banner");
   private restoreButton = $<HTMLButtonElement>("snapshot-restore");
   private strip = $("version-strip");
+  private showStrip = $("show-strip"); // brings a hidden version bar back
   private track = $("version-track");
   private tip = $("version-tip");
   private stripOn = storage("version-strip") !== "0";
@@ -35,6 +37,7 @@ export class HistoryPanel {
   constructor(private handlers: Handlers) {
     this.button.onclick = () => this.toggle();
     $("hide-strip").onclick = () => this.toggleStrip();
+    this.showStrip.onclick = () => this.toggleStrip();
 
     // A plain mouse wheel scrolls vertically; let it move the timeline sideways too.
     const scroller = this.track.parentElement!;
@@ -50,6 +53,7 @@ export class HistoryPanel {
     scroller.addEventListener("scroll", () => this.updateFades());
     new ResizeObserver(() => this.updateFades()).observe(scroller);
     $("snapshot-back").onclick = () => handlers.onCurrent();
+    $("snapshot-compare").onclick = () => this.viewing && handlers.onCompare(this.viewing);
     // Restoring overwrites the file (the current state is saved first), so ask for a second click.
     this.restoreButton.onclick = async () => {
       if (!this.viewing) return;
@@ -121,13 +125,28 @@ export class HistoryPanel {
   }
 
   async refresh() {
-    if (!this.path || !this.available || (this.panel.hidden && !this.stripOn)) return;
+    if (this.panel.hidden && !this.stripOn) return;
+    await this.load();
+  }
+
+  /** Fetch the open file's versions (newest first), whether or not anything shows them. */
+  async load(): Promise<Snapshot[]> {
+    if (!this.path || !this.available) return [];
     const forPath = this.path;
     const res = await fetch(`/api/history?path=${encodeURIComponent(forPath)}`).catch(() => null);
-    if (!res?.ok || forPath !== this.path) return;
+    if (!res?.ok || forPath !== this.path) return this.snapshots;
     const body = (await res.json()) as { snapshots: Snapshot[] };
     this.snapshots = body.snapshots;
     this.render();
+    return this.snapshots;
+  }
+
+  get all(): readonly Snapshot[] {
+    return this.snapshots;
+  }
+
+  get enabled() {
+    return this.available;
   }
 
   /** Mark which version the preview is showing (null = the live file). */
@@ -194,7 +213,15 @@ export class HistoryPanel {
       meta.className = "meta";
       meta.textContent = `${snap.author} · ${relativeTime(snap.time)}`;
       what.append(label, meta);
-      li.append(kind, what);
+      const compare = document.createElement("button");
+      compare.className = "row-compare";
+      compare.textContent = "Compare";
+      compare.title = "Compare with the current version";
+      compare.onclick = (e) => {
+        e.stopPropagation();
+        this.handlers.onCompare(snap);
+      };
+      li.append(kind, what, compare);
       li.onclick = () => this.handlers.onView(snap);
       rows.push(li);
     }
@@ -210,6 +237,7 @@ export class HistoryPanel {
 
   private renderStrip() {
     this.strip.hidden = !(this.available && this.stripOn);
+    this.showStrip.hidden = !(this.available && !this.stripOn);
     if (this.strip.hidden) return;
 
     const make = (cls: string, glyph: string, active: boolean, tipText: () => [string, string], onClick: () => void) => {

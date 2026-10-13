@@ -104,21 +104,13 @@ async function render() {
     const pdf = await task.promise;
     const pagesEl = document.createElement("div");
     pagesEl.className = "pages";
-    const dpr = window.devicePixelRatio || 1;
     const available = viewer.clientWidth - 48;
 
     for (let n = 1; n <= pdf.numPages; n++) {
       const page = await pdf.getPage(n);
       const scale = zoom === "fit" ? available / page.getViewport({ scale: 1 }).width : zoom;
       if (n === 1) renderedScale = scale;
-      const viewport = page.getViewport({ scale: scale * dpr });
-      const canvas = document.createElement("canvas");
-      canvas.className = "page";
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
-      canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
-      await page.render({ canvas, viewport }).promise;
+      const canvas = await renderPage(page, scale);
       if (token !== renderToken) return;
       pagesEl.append(canvas);
     }
@@ -129,6 +121,20 @@ async function render() {
   } finally {
     task.destroy();
   }
+}
+
+/** Draw one page at `scale` CSS pixels per PDF unit, sharp on high-DPI screens. */
+export async function renderPage(page: pdfjs.PDFPageProxy, scale: number): Promise<HTMLCanvasElement> {
+  const dpr = window.devicePixelRatio || 1;
+  const viewport = page.getViewport({ scale: scale * dpr });
+  const canvas = document.createElement("canvas");
+  canvas.className = "page";
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
+  canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
+  await page.render({ canvas, viewport }).promise;
+  return canvas;
 }
 
 /** Re-render at the current width (after a pane resize, for example). */
@@ -158,13 +164,15 @@ $("zoom-fit").onclick = fitWidth;
 
 // ---------- keyboard scrolling ----------
 
-export function scroll(how: "down" | "up" | "half-down" | "half-up" | "top" | "bottom") {
-  const half = viewer.clientHeight / 2;
+export type ScrollHow = "down" | "up" | "half-down" | "half-up" | "top" | "bottom";
+
+export function scroll(how: ScrollHow, el: HTMLElement = viewer) {
+  const half = el.clientHeight / 2;
   const behavior = reduceMotion.matches ? "instant" : "smooth";
-  if (how === "top") return viewer.scrollTo({ top: 0, behavior });
-  if (how === "bottom") return viewer.scrollTo({ top: viewer.scrollHeight, behavior });
+  if (how === "top") return el.scrollTo({ top: 0, behavior });
+  if (how === "bottom") return el.scrollTo({ top: el.scrollHeight, behavior });
   const by = { down: 70, up: -70, "half-down": half, "half-up": -half }[how];
-  viewer.scrollBy({ top: by, behavior: how.startsWith("half") ? behavior : "instant" });
+  el.scrollBy({ top: by, behavior: how.startsWith("half") ? behavior : "instant" });
 }
 
 // Pages are fitted to the width, so only a width change needs a re-render. Height changes
@@ -210,7 +218,7 @@ export function openLogs() {
 export function showDiagnostics(list: Diagnostic[]) {
   activeDiagnostic = -1;
   const errors = list.filter((d) => d.severity === "error").length;
-  logsButton.textContent = list.length ? `Logs (${list.length})` : "Logs";
+  logsButton.querySelector(".label")!.textContent = list.length ? `Logs (${list.length})` : "Logs";
   logsButton.classList.toggle("has-errors", errors > 0);
 
   if (list.length === 0) {

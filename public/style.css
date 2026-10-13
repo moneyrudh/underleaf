@@ -557,3 +557,201 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .vdot { transition: none; }
 }
+
+/* ---------- compare ---------- */
+
+.viewer-col.comparing .snapshot-banner { display: none; } /* the compare bar says what's on screen */
+.history li .row-compare { visibility: hidden; align-self: center; margin-left: auto; flex: none; font-size: 11.5px; padding: 2px 8px; }
+.history li:hover .row-compare, .history li .row-compare:focus-visible { visibility: visible; }
+
+.compare-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--chrome-2);
+  border-bottom: 1px solid var(--chrome-line);
+  font-size: 12.5px;
+}
+.compare-bar button { font-size: 12.5px; padding: 3px 10px; }
+.compare-bar .icon { padding: 3px 8px; }
+.compare-sides { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 320px; }
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: 300px;
+  padding: 3px 8px;
+  background: var(--chrome);
+  text-align: left;
+}
+.picker[aria-expanded="true"] { border-color: var(--accent); }
+.picker .icon { flex: none; width: 14px; text-align: center; color: var(--chrome-muted); }
+.picker-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker .chevron { flex: none; color: var(--chrome-muted); font-size: 10px; }
+.kind-claude.icon, .menu .kind-claude .icon { color: #e0915a; }
+.kind-export.icon, .menu .kind-export .icon { color: var(--accent); }
+.kind-restore.icon, .menu .kind-restore .icon { color: #7aa7e0; }
+.kind-current.icon, .menu .kind-current .icon { color: var(--accent); font-size: 9px; }
+
+/* dropdown list (compare pickers) */
+.menu {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-2);
+  color: var(--chrome-fg);
+  border: 1px solid var(--chrome-line);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+  overflow: hidden;
+  font-size: 13px;
+}
+.menu input {
+  margin: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--chrome);
+  border: 1px solid var(--chrome-line);
+  border-radius: 6px;
+  outline: none;
+}
+.menu input:focus { border-color: #4b6153; }
+.menu ul { list-style: none; margin: 0; padding: 0 4px 4px; overflow: auto; }
+.menu li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.menu li.active { background: #33433a; }
+.menu li.empty { cursor: default; color: var(--chrome-muted); }
+.menu .icon { width: 14px; flex: none; text-align: center; color: var(--chrome-muted); }
+.menu .what { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.menu .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .meta { font-size: 11.5px; color: var(--chrome-muted); }
+.menu .check { flex: none; width: 14px; color: var(--accent); }
+.compare-sides .arrow { color: var(--chrome-muted); flex: none; }
+.compare-names { overflow: hidden; text-overflow: ellipsis; white-space: pre; color: var(--chrome-fg); }
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; color: var(--chrome-muted); }
+.seg button:first-child { border-radius: 6px 0 0 6px; }
+.seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.seg button.on { color: var(--chrome-fg); background: #33433a; border-color: #4b6153; position: relative; }
+.seg button:disabled { opacity: 0.4; cursor: default; }
+
+.diff { flex: 1; min-height: 0; overflow: auto; padding: 16px; color: var(--panel-fg); }
+.diff > * { transition: opacity 150ms ease-out; }
+.diff.loading > * { opacity: 0.45; }
+
+/* reader: both PDFs side by side, one scroller so they move together */
+.diff-reader { display: grid; grid-template-columns: repeat(2, max-content); gap: 14px var(--gap); justify-content: center; }
+.diff-head {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 2px;
+  background: var(--bg);
+  font-size: 12px;
+  color: #6c7a71;
+}
+.diff-head .tag { flex: none; font-weight: 700; font-size: 10.5px; letter-spacing: 0.6px; text-transform: uppercase; }
+.diff-head.before .tag { color: var(--error); }
+.diff-head.after .tag { color: #2f8a4f; }
+.diff-head .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-reader .diff-head { max-width: 100%; width: 0; min-width: 100%; }
+.diff-page { position: relative; }
+.diff-page.missing { border: 1px dashed var(--border); border-radius: 4px; }
+.hl { position: absolute; border-radius: 2px; pointer-events: none; mix-blend-mode: multiply; }
+.hl.del { background: rgb(229 72 60 / 0.28); }
+.hl.add { background: rgb(52 168 83 / 0.30); }
+.hl.caret { width: 2px !important; margin-left: -1px; }
+.hl.caret.del { background: rgb(229 72 60 / 0.9); }
+.hl.caret.add { background: rgb(52 168 83 / 0.9); }
+/* the change ]c / [c landed on: a stronger fill rather than outlines, which get noisy on long changes */
+.hl.del.current { background: rgb(229 72 60 / 0.55); }
+.hl.add.current { background: rgb(52 168 83 / 0.58); }
+.hl.caret.current { box-shadow: 0 0 0 2px #f0b429; }
+
+/* source: line diff with the changed words marked */
+.diff-source { font: 12.5px/1.55 var(--mono); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.diff-source-head { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--border); position: sticky; top: -16px; z-index: 1; }
+.diff-source-head .diff-head { background: transparent; }
+.src-row { display: grid; grid-template-columns: 3.2em 3.2em 1.4em 1fr; }
+.src-row .ln { text-align: right; padding-right: 8px; color: #9aa59e; user-select: none; }
+.src-row .sign { text-align: center; user-select: none; color: #9aa59e; }
+.src-row .code { white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 16px; min-width: 0; } /* LaTeX paragraphs are long lines: wrap them */
+.src-row.del { background: rgb(229 72 60 / 0.09); }
+.src-row.add { background: rgb(52 168 83 / 0.10); }
+.src-row.del .sign { color: var(--error); }
+.src-row.add .sign { color: #2f8a4f; }
+.src-row.del mark { background: rgb(229 72 60 / 0.28); color: inherit; border-radius: 2px; }
+.src-row.add mark { background: rgb(52 168 83 / 0.32); color: inherit; border-radius: 2px; }
+.src-row.current { box-shadow: inset 3px 0 0 #f0b429; }
+.src-fold {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  border-block: 1px solid var(--border);
+  padding: 3px 12px 3px 6.6em;
+  background: rgb(127 140 132 / 0.08);
+  color: #7d8a82;
+  font: inherit;
+}
+.src-fold:hover { background: rgb(127 140 132 / 0.16); }
+.diff .message .ghost { margin-top: 10px; }
+
+@media (prefers-color-scheme: dark) {
+  .hl { mix-blend-mode: normal; }
+  .diff-head { color: #9aa59e; }
+  .diff-head.after .tag, .src-row.add .sign { color: #6fd08f; }
+}
+
+/* ---------- key hints ---------- */
+
+/* A shortcut chip inside a button: "History H" */
+button kbd.k {
+  margin-left: 6px;
+  padding: 1px 4px;
+  font-size: 10px;
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.07);
+  color: var(--chrome-muted);
+  vertical-align: 1px;
+}
+.primary kbd.k { background: rgb(15 26 19 / 0.14); color: rgb(15 26 19 / 0.7); }
+.snapshot-banner .ghost kbd.k { background: rgb(74 59 15 / 0.08); color: #7a6630; }
+.seg button.on kbd.k { display: none; } /* S switches to the other view, so only the other button shows it */
+
+/* Tooltip for icon buttons (and anything with data-tip), with its shortcut */
+.tip {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 320px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #0f1612;
+  color: var(--chrome-fg);
+  border: 1px solid var(--chrome-line);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.3);
+  font-size: 12px;
+  pointer-events: none;
+}
+.tip kbd { padding: 1px 4px; font-size: 10.5px; }
+.tip kbd:first-of-type { margin-left: 4px; }
+
+@media (prefers-color-scheme: dark) {
+  .snapshot-banner .ghost kbd.k { background: rgb(241 227 184 / 0.1); color: #cdbb85; }
+}
+
+/* keyboard focus: the app's accent instead of the browser's blue ring */
+button:focus-visible, a:focus-visible, .menu input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
