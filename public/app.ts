@@ -1,12 +1,14 @@
 import type { DirNode, FileNode } from "../src/workspace";
 import type { Snapshot } from "../src/history";
-import { HistoryPanel, relativeTime } from "./history";
+import { HistoryPanel, KIND_ICONS, relativeTime } from "./history";
+import { DiffView, type Side } from "./diff";
 import { FileTree } from "./tree";
 import { ClaudeTerminal, type ClaudeStart } from "./terminal";
 import * as preview from "./preview";
 import { closePalette, openPalette, paletteOpen } from "./palette";
 import { installKeymap, label, LEADER, type Bindings } from "./keys";
 import { $, formatBytes, storage, toast } from "./util";
+import { installHints } from "./hints";
 
 type Message =
   | { type: "tree"; trees: DirNode[]; docs: string[]; roots: Record<string, string>; history: boolean }
@@ -67,6 +69,15 @@ function handle(msg: Message) {
   if (msg.type === "history") return void versions.refresh();
   if (!selected || msg.doc !== selected.path) return;
 
+  // Comparing: a live side follows the build, and nothing else on screen changes.
+  if (diffView.active) {
+    if (msg.type === "compiled") {
+      lastPdf = msg.pdf;
+      diffView.livePdf(msg.doc, msg.pdf);
+    }
+    return;
+  }
+
   // While an earlier version is on screen, keep tracking the live build but don't replace the view.
   if (msg.type === "compiling") return versions.viewing ? undefined : preview.setStatus("compiling…", "busy");
   if (versions.viewing) {
@@ -116,6 +127,9 @@ function onTree(trees: DirNode[]) {
     selected = null;
     tree.setOpened(null);
     showNothing();
+  } else if (diffView.active) {
+    if (now.mtime !== selected.mtime) diffView.liveFile(now.path);
+    selected = now;
   } else if (versions.viewing) {
     selected = now; // looking at an earlier version: the live file refreshes when you go back
   } else if (now.kind !== selected.kind || (now.kind !== "doc" && now.mtime !== selected.mtime)) {
@@ -127,7 +141,8 @@ function onTree(trees: DirNode[]) {
 
 function open(file: FileNode) {
   const switching = file.path !== selected?.path;
-  const leavingSnapshot = !!versions.viewing;
+  const leavingSnapshot = !!versions.viewing || diffView.active;
+  closeCompare();
   leaveSnapshot();
   // Keep what's on screen (dimmed) until the next view is ready, instead of blanking it.
   if ((switching || leavingSnapshot) && preview.hasContent()) preview.beginLoading({ keepScroll: !switching });
@@ -173,6 +188,7 @@ function open(file: FileNode) {
 }
 
 function showNothing() {
+  closeCompare();
   leaveSnapshot();
   versions.setFile(null, historyEnabled);
   title.textContent = "Preview";
@@ -190,8 +206,10 @@ window.addEventListener("hashchange", () => {
 // ---------- version history ----------
 
 const versions = new HistoryPanel({
-  onView: (snap) => viewSnapshot(snap),
-  onCurrent: () => selected && open(selected),
+  // While comparing versions, the strip (and , / .) moves the "before" side.
+  onView: (snap) => (comparing ? compareVersions(snap, comparing.b) : viewSnapshot(snap)),
+  onCurrent: () => (comparing?.b ? compareVersions(null, comparing.b) : selected && open(selected)),
+  onCompare: (snap) => compareVersions(snap, null),
   onRestore: (snap) => restoreSnapshot(snap),
 });
 
@@ -203,6 +221,7 @@ function leaveSnapshot() {
 
 async function viewSnapshot(snap: Snapshot) {
   if (!selected || !snap.path) return;
+  closeCompare();
   versions.showViewing(snap);
   if (preview.hasContent()) preview.beginLoading({ keepScroll: true }); // same file: keep your place
   exportButton.hidden = download.hidden = true;
@@ -250,6 +269,104 @@ async function restoreSnapshot(snap: Snapshot) {
         : `Restored ${selected.name}. The version you replaced is saved in history.`,
   );
   open(selected);
+}
+
+// ---------- comparing ----------
+
+const diffView = new DiffView({
+  onPick: (which, value) => {
+    if (!comparing) return;
+    const snap = value === "now" ? null : (versions.all.find((s) => s.id === value) ?? null);
+    compareVersions(which === "a" ? snap : comparing.a, which === "b" ? snap : comparing.b);
+  },
+  onClose: () => selected && open(selected),
+});
+
+/** Versions of the open file being compared (null = its current state), or null when comparing two files. */
+let comparing: { a: Snapshot | null; b: Snapshot | null } | null = null;
+
+const COMPARABLE = new Set(["doc", "tex", "text"]);
+
+function closeCompare() {
+  comparing = null;
+  diffView.close();
+}
+
+function versionSide(snap: Snapshot | null): Side {
+  const file = selected!;
+  if (!snap) return { path: file.path, label: "Current version", pdf: lastPdf, doc: file.kind === "doc" };
+  return {
+    path: file.path,
+    label: `${snap.label} · ${relativeTime(snap.time)}`,
+    commit: snap.id,
+    snapPath: snap.path,
+    doc: file.kind === "doc" && !!snap.path?.endsWith(".tex"),
+  };
+}
+
+function enterCompare() {
+  exportButton.hidden = download.hidden = zoomGroup.hidden = true;
+  $("logs").hidden = true; // the current build's logs would only squeeze the comparison
+  focusPane("preview");
+}
+
+async function compareVersions(a: Snapshot | null, b: Snapshot | null) {
+  if (!selected || !COMPARABLE.has(selected.kind)) return toast("Only LaTeX and text files can be compared");
+  comparing = { a, b };
+  versions.showViewing(a); // the version strip marks the "before" side
+  enterCompare();
+  const options = [
+    { value: "now", label: "Current version", meta: "live", icon: "●", kind: "current" },
+    ...versions.all.map((s) => ({ value: s.id, label: s.label, meta: `${s.author} · ${relativeTime(s.time)}`, icon: KIND_ICONS[s.kind], kind: s.kind })),
+  ];
+  await diffView.show(versionSide(a), versionSide(b), options, [a?.id ?? "now", b?.id ?? "now"]);
+}
+
+/** C: what changed since the last version that differs from the file as it is now. */
+async function compareWithPrevious() {
+  if (!selected || !COMPARABLE.has(selected.kind)) return toast("Open a LaTeX or text file to compare its versions");
+  if (!versions.enabled) return toast("Version history covers files in latex/");
+  if (versions.viewing) return compareVersions(versions.viewing, null);
+  const file = selected;
+  const snaps = (await versions.load()).filter((s) => s.path);
+  const text = async (url: string) => {
+    const res = await fetch(url).catch(() => null);
+    return res?.ok ? res.text() : null;
+  };
+  const now = await text(`/api/file?path=${encodeURIComponent(file.path)}&t=${Date.now()}`);
+  // The newest snapshots often match the file as it is (they were taken from it); skip those.
+  for (const snap of snaps.slice(0, 25)) {
+    const then = await text(`/api/history/file?commit=${snap.id}&path=${encodeURIComponent(snap.path!)}`);
+    if (selected?.path !== file.path) return; // opened something else meanwhile
+    if (then !== now) return compareVersions(snap, null);
+  }
+  toast(snaps.length ? `No earlier version of ${file.name} differs from it` : `No earlier versions of ${file.name} yet`);
+}
+
+/** Compare the open file with another one (both as they are now). */
+function compareWithFile() {
+  const from = selected;
+  if (!from || !COMPARABLE.has(from.kind)) return toast("Open a LaTeX or text file to compare");
+  const others = tree.files().filter((f) => f.path !== from.path && COMPARABLE.has(f.kind));
+  const rank = (f: FileNode) => (f.kind === from.kind ? 0 : 1); // same kind first: two documents get the reader view
+  openPalette({
+    placeholder: `Compare ${from.name} with…`,
+    emptyText: "No other files to compare with",
+    items: others.sort((x, y) => rank(x) - rank(y) || x.path.localeCompare(y.path)).map((f) => ({ label: f.path, run: () => compareFiles(from, f) })),
+  });
+}
+
+function compareFiles(a: FileNode, b: FileNode) {
+  closeCompare();
+  leaveSnapshot();
+  enterCompare();
+  const side = (f: FileNode): Side => ({ path: f.path, label: f.path, pdf: f.path === selected?.path ? lastPdf : null, doc: f.kind === "doc" });
+  diffView.show(side(a), side(b));
+}
+
+function toggleCompare() {
+  if (diffView.active) selected && open(selected);
+  else compareWithPrevious();
 }
 
 // ---------- actions ----------
@@ -442,7 +559,15 @@ const COMMANDS: Command[] = [
   { title: "Toggle Claude", run: () => togglePane("claude") },
   { title: "Toggle logs", keys: "L", run: preview.toggleLogs, when: isDoc },
   { title: "Version history", keys: "H", run: () => versions.toggle(), when: () => historyEnabled && !!selected?.path.startsWith("latex/") },
-  { title: "Back to current version", run: () => selected && open(selected), when: () => !!versions.viewing },
+  { title: "Back to current version", run: () => selected && open(selected), when: () => !!versions.viewing && !diffView.active },
+  { title: "Compare with previous version", keys: "C", run: compareWithPrevious, when: () => versions.enabled && !diffView.active },
+  { title: "Compare with current version", run: () => versions.viewing && compareVersions(versions.viewing, null), when: () => !!versions.viewing && !diffView.active },
+  { title: "Compare with another file…", run: compareWithFile, when: () => !!selected && COMPARABLE.has(selected.kind) },
+  { title: "Close comparison", keys: "escape", run: () => selected && open(selected), when: () => diffView.active },
+  { title: "Next change", keys: "] c", run: () => diffView.step(1), when: () => diffView.active },
+  { title: "Previous change", keys: "[ c", run: () => diffView.step(-1), when: () => diffView.active },
+  { title: "Compare: reader view", run: () => diffView.setMode("reader"), when: () => diffView.active && diffView.mode !== "reader" },
+  { title: "Compare: source", keys: "S", run: () => diffView.setMode("source"), when: () => diffView.active && diffView.mode !== "source" },
   { title: "Toggle version bar", keys: "V", run: () => versions.toggleStrip(), when: () => historyEnabled },
   { title: "Older version", keys: ",", run: () => versions.step(-1), when: () => historyEnabled },
   { title: "Newer version", keys: ".", run: () => versions.step(1), when: () => historyEnabled },
@@ -473,13 +598,15 @@ const TREE_KEYS: Bindings = {
   "/": quickOpen,
 };
 
+const scrollPreview = (how: preview.ScrollHow) => preview.scroll(how, diffView.active ? diffView.scroller : undefined);
+
 const PREVIEW_KEYS: Bindings = {
-  j: () => preview.scroll("down"),
-  k: () => preview.scroll("up"),
-  d: () => preview.scroll("half-down"),
-  u: () => preview.scroll("half-up"),
-  "g g": () => preview.scroll("top"),
-  G: () => preview.scroll("bottom"),
+  j: () => scrollPreview("down"),
+  k: () => scrollPreview("up"),
+  d: () => scrollPreview("half-down"),
+  u: () => scrollPreview("half-up"),
+  "g g": () => scrollPreview("top"),
+  G: () => scrollPreview("bottom"),
   "+": () => preview.stepZoom(1),
   "-": () => preview.stepZoom(-1),
   "=": preview.fitWidth,
@@ -490,6 +617,11 @@ const PREVIEW_KEYS: Bindings = {
   ".": () => versions.step(1),
   "] e": () => preview.cycleDiagnostic(1),
   "[ e": () => preview.cycleDiagnostic(-1),
+  C: toggleCompare,
+  "] c": () => diffView.step(1),
+  "[ c": () => diffView.step(-1),
+  S: () => diffView.active && diffView.toggleMode(),
+  escape: () => (diffView.active || versions.viewing) && selected && open(selected), // close a comparison, or leave an earlier version
   a: () => mention(selected ?? undefined),
 };
 
@@ -521,6 +653,7 @@ installKeymap({
 $("quick-open").onclick = quickOpen;
 $("help").onclick = toggleCheatsheet;
 for (const kbd of document.querySelectorAll<HTMLElement>("kbd[data-key]")) kbd.textContent = label(kbd.dataset.key!);
+installHints();
 
 // ---------- cheat sheet ----------
 
@@ -580,6 +713,10 @@ function renderCheatsheet() {
         ["H", "Version history"],
         [",", "Older version (.: newer)"],
         ["V", "Toggle version bar"],
+        ["C", "Compare with previous version"],
+        ["] c", "Next change ([ c: previous)"],
+        ["S", "Reader view ↔ source diff"],
+        ["escape", "Close comparison / back to current"],
         ["a", "Mention file in Claude"],
       ],
     ],

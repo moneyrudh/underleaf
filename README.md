@@ -95,6 +95,15 @@ underleaf snapshots `latex/` automatically, so you can look back at any earlier 
 
 The **version bar** above the preview is a timeline of the open file: oldest on the left, **Now** on the right. Hover a dot for its label, click it to open that version, or step through with `,` (older) and `.` (newer). Press `V` to hide or show the bar. For the full list with labels, open **History** in the preview toolbar (or press `H`). Click a snapshot to preview that version (documents are compiled as they were). **Restore this version** puts it back, and the version it replaces is saved first, so a restore can be undone too. History follows renames.
 
+### Comparing versions
+
+Press `C` in the preview to see what changed since the previous version of the open file. You can also click **Compare** on any row in History, or **Compare with current** in the banner of an earlier version. To compare two files, such as two tailored resumes, run **Compare with another file…** from the command palette.
+
+- **Reader** (the default) shows what a reader sees: both PDFs side by side. Removed words are red on the left, added words are green on the right, and a thin marker shows where text was cut or inserted. Changes are word by word on the compiled text, so moving a line break or reflowing a paragraph doesn't show up as an edit.
+- **Source** (`S`) shows the LaTeX itself as a line diff with the changed words highlighted. Unchanged stretches are folded; click one to expand it. Files that don't compile to a PDF (Markdown, BibTeX, `\input` fragments) always use this view.
+
+Pick either side from the two menus. While comparing, the version bar and `,`/`.` move the "before" side. `]c`/`[c` jump between changes, and `Esc` (or **Done**) goes back. If the current version is one side, the comparison updates live as you or Claude edit.
+
 History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
 
 ### Keyboard
@@ -113,7 +122,7 @@ The `‹` in the Files header collapses the file tree to a slim rail; `›` brin
 
 Vim-style keys work when the file tree or preview has focus:
 - **Tree:** `j`/`k`, `h`/`l`, `gg`/`G`, Enter, `a` to mention the file in Claude, `y` to copy its path.
-- **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs, `H` for history, `,`/`.` for older/newer versions, `V` for the version bar.
+- **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs, `H` for history, `,`/`.` for older/newer versions, `V` for the version bar, `C` to compare with the previous version (`]c`/`[c` next/previous change, `S` reader ↔ source, `Esc` to close).
 
 While Claude has focus, every other key goes to Claude, including Esc to interrupt it. Shift+Enter inserts a newline, and the macOS editing keys work like they do in Terminal or iTerm2: ⌘⌫ deletes the line, ⌥⌫ deletes a word, ⌘←/→ jumps to the line start or end, ⌥←/→ moves by word.
 

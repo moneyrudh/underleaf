@@ -16,20 +16,20 @@
         <span>Go to file…</span><kbd data-key="mod+p"></kbd>
       </button>
       <span class="spacer"></span>
-      <button id="toggle-tree" class="toggle on" title="Toggle file tree">Files</button>
-      <button id="toggle-claude" class="toggle on" title="Toggle Claude Code">Claude</button>
-      <button id="help" class="toggle icon" title="Keyboard shortcuts (?)">?</button>
+      <button id="toggle-tree" class="toggle on" data-tip="Show or hide files · focus them with" data-key="LEADER 1">Files</button>
+      <button id="toggle-claude" class="toggle on" data-tip="Show or hide Claude · focus it with" data-key="LEADER 2">Claude</button>
+      <button id="help" class="toggle icon" aria-label="Keyboard shortcuts" data-tip="Keyboard shortcuts" data-key="?">?</button>
     </header>
 
     <main id="workspace" class="workspace">
       <div id="tree-rail" class="tree-rail" hidden>
-        <button id="expand-tree" class="rail-button" title="Show files"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
+        <button id="expand-tree" class="rail-button" aria-label="Show files" data-tip="Show files" data-key="LEADER 1"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
       </div>
       <nav id="tree-pane" class="pane tree-pane" tabindex="0" aria-label="Files">
         <div class="pane-head">
           <span class="pane-title">Files</span>
           <span class="spacer"></span>
-          <button id="collapse-tree" class="rail-button" title="Hide files"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+          <button id="collapse-tree" class="rail-button" aria-label="Hide files" data-tip="Hide files"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
         </div>
         <div id="tree" class="tree" role="tree"></div>
       </nav>
@@ -50,19 +50,20 @@
           <span id="status" class="status"></span>
           <span class="spacer"></span>
           <div id="zoom" class="zoom" role="group" aria-label="Zoom">
-            <button id="zoom-out" title="Zoom out (-)">−</button>
-            <button id="zoom-fit" title="Fit width (=)">Fit</button>
-            <button id="zoom-in" title="Zoom in (+)">+</button>
+            <button id="zoom-out" data-tip="Zoom out" data-key="-">−</button>
+            <button id="zoom-fit" data-tip="Fit to width" data-key="=">Fit</button>
+            <button id="zoom-in" data-tip="Zoom in" data-key="+">+</button>
           </div>
-          <button id="toggle-history" class="ghost" hidden title="Version history (H)">History</button>
-          <button id="toggle-logs" class="ghost" hidden title="Logs (L)">Logs</button>
-          <button id="export" class="primary" hidden title="Save the PDF into resumes/">Save PDF</button>
-          <a id="download" class="ghost icon" hidden title="Download">⤓</a>
+          <button id="show-strip" class="ghost" hidden data-key="V">Versions</button>
+          <button id="toggle-history" class="ghost" hidden data-key="H">History</button>
+          <button id="toggle-logs" class="ghost" hidden data-key="L"><span class="label">Logs</span></button>
+          <button id="export" class="primary" hidden data-key="mod+s">Save PDF</button>
+          <a id="download" class="ghost icon" hidden data-tip="Download PDF" aria-label="Download PDF">⤓</a>
         </div>
         <div id="version-strip" class="version-strip" hidden>
           <span class="strip-title">Versions</span>
           <div class="strip-scroll"><ol id="version-track" class="version-track"></ol></div>
-          <button id="hide-strip" class="rail-button" title="Hide version bar (V)">
+          <button id="hide-strip" class="rail-button" aria-label="Hide version bar" data-tip="Hide version bar" data-key="V">
             <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
           </button>
           <div id="version-tip" class="version-tip" hidden></div>
@@ -72,10 +73,28 @@
             <div id="snapshot-banner" class="snapshot-banner" hidden>
               <span class="snapshot-what"></span>
               <span class="spacer"></span>
+              <button id="snapshot-compare" class="ghost" data-key="C">Compare with current</button>
               <button id="snapshot-restore" class="ghost">Restore this version</button>
-              <button id="snapshot-back" class="primary">Back to current</button>
+              <button id="snapshot-back" class="primary" data-key="escape">Back to current</button>
+            </div>
+            <div id="compare-bar" class="compare-bar" hidden>
+              <div class="compare-sides">
+                <button id="compare-a" class="picker" aria-haspopup="listbox" aria-label="Before"></button>
+                <span class="arrow">→</span>
+                <button id="compare-b" class="picker" aria-haspopup="listbox" aria-label="After"></button>
+                <span id="compare-names" class="compare-names" hidden></span>
+              </div>
+              <span class="spacer"></span>
+              <div class="seg" role="group" aria-label="Compare">
+                <button id="compare-reader" data-key="S">Reader</button>
+                <button id="compare-source" data-key="S">Source</button>
+              </div>
+              <button id="compare-prev" class="ghost icon" aria-label="Previous change" data-tip="Previous change" data-key="[ c">↑</button>
+              <button id="compare-next" class="ghost icon" aria-label="Next change" data-tip="Next change" data-key="] c">↓</button>
+              <button id="compare-close" class="primary" data-key="escape">Done</button>
             </div>
             <div id="viewer" class="viewer"></div>
+            <div id="diff" class="diff" hidden></div>
           </div>
           <aside id="logs" class="logs" hidden><ul id="diagnostics"></ul></aside>
           <aside id="history" class="history" hidden>
