@@ -14,13 +14,44 @@ Local, Overleaf-style LaTeX workspace in the browser: file tree | embedded Claud
 
 - `src/compile.ts` — engine detection (`% !TEX program`, fontspec → xelatex, else pdflatex), latexmk if installed else engine ×≤3 passes, log → diagnostics (unwrapped via `max_print_line` env).
 - `src/workspace.ts` — tree scan (skips dotfiles/symlinks; `doc` = .tex with `\documentclass`), `resolveTreePath` (realpath containment check), `keepWatching` (recursive fs.watch + 1s inode health check that recreates deleted/replaced roots).
-- `src/claude.ts` — one shared `claude` PTY via `Bun.spawn({ terminal })`, 512KB scrollback replayed on reconnect, Enter restarts after exit. Runs the user's **unmodified** `claude` with their own login (per Anthropic's terms; the Agent SDK would require API keys for a distributed app).
+- `public/terminal.ts` maps keys xterm.js doesn't translate (Shift+Enter → `\n`, ⌘⌫ → Ctrl+U, ⌥⌫ → ESC DEL, ⌘/⌥ arrows → readline moves) via `attachCustomKeyEventHandler`.
+- `src/claude.ts` — starts with `--continue` (falls back to a fresh session if that exits non-zero within 5s), waits for the pane's first resize before spawning, and warns in the pane when `~/.claude.json` isn't readable (root-owned from `sudo claude` → onboarding every launch). One shared `claude` PTY via `Bun.spawn({ terminal })`, 512KB scrollback replayed on reconnect, Enter restarts after exit. Runs the user's **unmodified** `claude` with their own login (per Anthropic's terms; the Agent SDK would require API keys for a distributed app).
 - `src/server.ts` — binds 127.0.0.1; `trusted()` checks Host + Origin on all APIs and WS upgrades. Sidebar paths are `latex/…` / `resumes/…`. Routes: `/api/pdf?doc=`, `/api/file?path=` (sandbox CSP), `POST /api/export` (→ `resumes/` mirroring source path), WS `/ws` (tree + compile events) and `/claude` (PTY).
-- `public/` — `app.ts` (state, selection, layout/splitters), `tree.ts`, `preview.ts` (pdf.js v6: `getDocument({url})`, `render({canvas, viewport})`, destroy via loading task; off-screen render then swap), `terminal.ts` (xterm.js + fit addon).
-- `build/`, `latex/`, `resumes/` are git-ignored. `examples/` holds committed demo docs.
+- `public/keys.ts` — keymap: capture-phase window listener so app chords beat xterm. Layers: `global` (mod+p, mod+shift+p, mod+s — fire even in Claude), `leader` (Ctrl+Space then a key), `pane` (vim keys, only when tree/preview focused and not typing; supports sequences like "g g"). Never bind plain Esc or ctrl-letter chords globally — Claude Code needs them.
+- `public/hints.ts` — every control with a shortcut shows it: `data-key` on a text button adds a `kbd.k` chip; `data-tip` gives a styled tooltip (with the key) instead, used for icon buttons. Don't use `title` for these. `LEADER` in `data-key` resolves to the platform leader.
+- `public/menu.ts` — anchored dropdown with filter + keyboard (used by the compare pickers); never use native `<select>`.
+- `public/palette.ts` — fuzzy picker shared by quick-open and the command palette (best-alignment subsequence scoring).
+- `public/` — `app.ts` (state, focus/`data-focused`, commands registry, cheat sheet, layout/splitters), `tree.ts` (cursor ≠ opened file; changed-file flash), `preview.ts` (pdf.js v6: `getDocument({url})`, `render({canvas, viewport})`, destroy via loading task; off-screen render then swap), `terminal.ts` (xterm.js + fit addon).
+- `build/`, `latex/`, `resumes/` are git-ignored. `examples/` holds committed demo docs. `templates/` is committed and copied into the workspace when missing (`seedWorkspace`: `resume.tex` when `latex/` has no .tex). Anything the in-app agent may personalize (its CLAUDE.md, memory, skills) must ship from `templates/` this way, never be tracked inside `latex/`.
+
+## Version history
+
+- Compare: `public/diffcore.ts` is DOM-free (pdf.js text runs → words with PDF-unit boxes, joining runs split at kerns and dehyphenating line ends; `diffWords` via jsdiff `diffArrays`; `diffSource` = line diff + word marks + folding). `public/diff.ts` (`DiffView`) renders both PDFs in one scroller (two grid columns, so they scroll together), plus the source view. Highlight positions come from the rendered pixels (`PageInk`): pdf.js only gives a run's total width and justified text stretches spaces, so the k widest blank columns in a run are its k spaces and each word is trimmed to its ink; pages with changes are re-rendered off-screen at ≥3 px/pt when the display is 1x. No server changes: sides load from `/api/pdf`, `/api/file`, `/api/history/pdf`, `/api/history/file`. While comparing, `versions.viewing` = the "before" side (so the strip and `,`/`.` move it) and the banner is hidden by `.viewer-col.comparing`.
+- `src/history.ts`: `HistoryStore` = plain git with `--git-dir=~/.underleaf/history/<id>.git --work-tree=latex/` (`UNDERLEAF_HOME` overrides the root). Workspace id lives in `latex/.underleaf/id` so history survives moving the folder. Snapshot kind/author live in commit trailers (`Underleaf-Kind`, `Underleaf-Path`); authors are `You`/`Claude`/`underleaf`. All git ops are serialized (index.lock). `log()` = `--follow -M` for the file plus exports grepped by exact `Underleaf-Path`, ordered by `rev-list` rank (git times are 1s resolution).
+- Triggers (server.ts): edit debounce `EDIT_IDLE_MS` (skipped while a Claude turn is active), Claude `Stop` hook, export (empty commit). Restore snapshots the current state first.
+- Claude hooks: `ensureClaudeHooks` merges two `http` hooks (UserPromptSubmit → `?event=prompt`, Stop → `?event=stop`) into `latex/.claude/settings.json` on every start (URL can't interpolate env, so the port is written in). Auth = per-run `UNDERLEAF_HOOK_TOKEN` header passed via `allowedEnvVars`; respond 204 with an empty body (UserPromptSubmit output would be added to Claude's context).
+- Past versions compile into `build/<ws>/.history/<commit>/` from `git archive | tar`; `/api/history/pdf` caches per (commit, doc).
 
 ## Rules
 
 - **Never commit anything from `latex/` or `resumes/`.** The remote (`github.com/moneyrudh/underleaf`) is public and the author's resumes live there locally.
 - File names are untrusted in the UI: `textContent`, never `innerHTML`.
 - No Overleaf or Claude Code branding in the product name/logo; plain-text "runs Claude Code" is fine.
+
+## The in-app agent (`templates/workspace/` → `latex/`)
+
+- `seedWorkspace` copies `templates/workspace/**` into the workspace on every start: `.underleaf/*` is underleaf-owned and refreshed when it differs; everything else (CLAUDE.md, memory/, .claude/skills, .claude/settings.json) is copied only if missing. Templates are public: never put real personal data in them.
+- `src/brief.ts` writes `latex/.underleaf/workspace.md` (docs, compile status, pages, errors, overfull lines, open file, exports), debounced after rescans and builds. The agent's CLAUDE.md imports it; instructions tell Claude to re-read it after saving.
+- Server builds every document once at startup, then on change rebuilds open docs + any document that itself changed, so the snapshot covers files nobody has open. Hidden paths (`.underleaf/`, `.claude/`) are ignored by the watcher.
+- The workspace settings disable Claude Code auto memory: `latex/` is inside this repo, and auto memory is keyed per git repo, so it would otherwise be shared with dev sessions here.
+- The agent also reads this file (parent directory). Its instructions treat it as background only; keep anything the agent needs in `templates/workspace/`, since binary users won't have this repo.
+
+## Roadmap
+
+1. ~~Hide agent files in the tree ("Show agent memory")~~
+2. ~~Version history (snapshots, timeline strip, History panel, restore)~~
+3. ~~Diff view ("what the reader sees" + source)~~
+4. **PDF → source**: compile with SyncTeX; clicking the preview inserts `@file.tex:LINE ` into Claude's prompt.
+5. **Source editor**: a source view beside/instead of the PDF (CodeMirror) for manual edits; saving writes the file, which the watcher turns into a normal "You edited" snapshot.
+6. **Distribution**: `bun build --compile` binaries (macOS/Windows/Linux), opening in a Chrome/Edge `--app` window. Revisit git (Windows) and hook shells before shipping.
+

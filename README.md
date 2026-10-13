@@ -43,7 +43,7 @@ Options: `bun dev [latex-dir] [--resumes dir] [--port N] [--no-open]`.
 | `latex/` | Your sources. Everything in here shows up in the file tree, and Claude works here. |
 | `resumes/` | Exported PDFs. **Save PDF** writes here, mirroring the source path (`latex/acme/main.tex` → `resumes/acme/main.pdf`). |
 
-Both are git-ignored, so personal files never end up in this repo. You can make either one its own git repo if you want history. If you delete or rename either folder while the app is running, underleaf recreates it empty and keeps going.
+On first run, an empty `latex/` gets a starter `resume.tex` copied from `templates/resume.tex`. Both folders are git-ignored, so personal files never end up in this repo. You can make either one its own git repo if you want history. If you delete or rename either folder while the app is running, underleaf recreates it empty and keeps going.
 
 ### The file tree
 
@@ -62,7 +62,71 @@ Hidden files (dotfiles) and symlinks are left out of the tree.
 
 ### The Claude pane
 
-It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. If Claude exits, press Enter to start a new one. Toggle the pane with **Claude** in the top bar.
+It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. When underleaf starts, Claude picks up your most recent conversation in `latex/` (`claude --continue`). The command palette has **new conversation** and **resume a previous conversation…** (Claude's own session picker). If Claude exits, press Enter to pick up where you left off. Toggle the pane with **Claude** in the top bar.
+
+#### The resume agent
+
+On startup, underleaf sets up `latex/` as a workspace for a resume-focused agent:
+
+| Path | Owner | Purpose |
+|---|---|---|
+| `CLAUDE.md` | you | Imports the files below. Add your own standing instructions here. |
+| `.underleaf/instructions.md` | underleaf | The agent's role and ground rules (never invent facts, one page, tailored versions in their own folder…). Refreshed on update. |
+| `.underleaf/workspace.md` | underleaf | Live snapshot: every document's compile status, page count, errors, and what's open. Claude re-reads it after edits. |
+| `memory/profile.md`, `memory/experience.yaml`, `memory/applications.md` | Claude & you | Long-term memory: who you are, a structured bank of every role and bullet, and a log of tailored applications. |
+| `.claude/skills/` | Claude & you | `tailor-resume`, `fit-one-page`, `update-memory`. Claude uses them automatically, or you can type `/tailor-resume`. |
+| `.claude/settings.json` | you | Accepts file edits without prompting, and turns off Claude Code's built-in auto memory so `memory/` is the single source. |
+
+Files marked "you" or "Claude & you" are copied in only when missing, so your changes are never overwritten. Everything lives in the git-ignored `latex/`, so it stays private. For history, run `git init` inside `latex/`.
+
+On first use, ask Claude to build your experience bank from your existing resumes.
+
+`CLAUDE.md` and `memory/` are hidden from the file tree by default. Run **Show agent memory** from the command palette (⌘⇧P) to see or edit what Claude remembers.
+
+### Version history
+
+underleaf snapshots `latex/` automatically, so you can look back at any earlier version of a file and restore it:
+
+| When | Snapshot label |
+|---|---|
+| You pause editing for ~10 seconds | "You edited main.tex" |
+| Claude finishes a turn that changed files | "Claude: *your prompt*" |
+| You press **Save PDF** | "Exported resumes/…" (so every PDF you sent maps to its exact source) |
+
+The **version bar** above the preview is a timeline of the open file: oldest on the left, **Now** on the right. Hover a dot for its label, click it to open that version, or step through with `,` (older) and `.` (newer). Press `V` to hide or show the bar. For the full list with labels, open **History** in the preview toolbar (or press `H`). Click a snapshot to preview that version (documents are compiled as they were). **Restore this version** puts it back, and the version it replaces is saved first, so a restore can be undone too. History follows renames.
+
+### Comparing versions
+
+Press `C` in the preview to see what changed since the previous version of the open file. You can also click **Compare** on any row in History, or **Compare with current** in the banner of an earlier version. To compare two files, such as two tailored resumes, run **Compare with another file…** from the command palette.
+
+- **Reader** (the default) shows what a reader sees: both PDFs side by side. Removed words are red on the left, added words are green on the right, and a thin marker shows where text was cut or inserted. Changes are word by word on the compiled text, so moving a line break or reflowing a paragraph doesn't show up as an edit.
+- **Source** (`S`) shows the LaTeX itself as a line diff with the changed words highlighted. Unchanged stretches are folded; click one to expand it. Files that don't compile to a PDF (Markdown, BibTeX, `\input` fragments) always use this view.
+
+Pick either side from the two menus. While comparing, the version bar and `,`/`.` move the "before" side. `]c`/`[c` jump between changes, and `Esc` (or **Done**) goes back. If the current version is one side, the comparison updates live as you or Claude edit.
+
+History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
+
+### Keyboard
+
+Press `?` (or the **?** button) for the full list. The essentials:
+
+| Key | Action |
+|---|---|
+| `⌘P` / `Ctrl+P` | Go to file (fuzzy search) |
+| `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
+| `⌘S` / `Ctrl+S` | Save PDF to `resumes/` |
+| `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
+| `Ctrl+Space` then `z` | Zoom the focused pane |
+
+The `‹` in the Files header collapses the file tree to a slim rail; `›` brings it back.
+
+Vim-style keys work when the file tree or preview has focus:
+- **Tree:** `j`/`k`, `h`/`l`, `gg`/`G`, Enter, `a` to mention the file in Claude, `y` to copy its path.
+- **Preview:** `j`/`k`, `d`/`u`, `gg`/`G`, `+`/`-`/`=` to zoom, `]e`/`[e` to step through errors, `L` for logs, `H` for history, `,`/`.` for older/newer versions, `V` for the version bar, `C` to compare with the previous version (`]c`/`[c` next/previous change, `S` reader ↔ source, `Esc` to close).
+
+While Claude has focus, every other key goes to Claude, including Esc to interrupt it. Shift+Enter inserts a newline, and the macOS editing keys work like they do in Terminal or iTerm2: ⌘⌫ deletes the line, ⌥⌫ deletes a word, ⌘←/→ jumps to the line start or end, ⌥←/→ moves by word.
+
+On macOS, `Ctrl+Space` switches input sources if you have more than one keyboard language enabled. In that case, change or disable that shortcut in System Settings → Keyboard → Keyboard Shortcuts → Input Sources.
 
 ### Security
 

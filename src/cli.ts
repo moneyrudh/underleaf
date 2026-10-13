@@ -51,6 +51,7 @@ function doctor() {
   console.log(`  ✓ bun       ${Bun.version}`);
   const engines = ENGINES.map(check).some(Boolean);
   const latexmk = check("latexmk");
+  const git = check("git");
 
   if (!engines) {
     console.log(`\nNo LaTeX engine found. Install a TeX distribution:`);
@@ -67,6 +68,10 @@ function doctor() {
   if (!latexmk) {
     console.log(`\nOptional: latexmk handles bibliographies and reruns more reliably.
   ${process.platform === "darwin" ? "sudo tlmgr install latexmk" : "install the latexmk package for your OS"}`);
+  }
+  if (!git) {
+    console.log(`\nOptional: git enables version history (snapshots, restore, comparisons).
+  ${process.platform === "darwin" ? "xcode-select --install" : process.platform === "win32" ? "https://git-scm.com/download/win" : "install git with your package manager"}`);
   }
   if (engines) console.log(`\nReady. Run \`bun dev\` and put .tex files in latex/.`);
   process.exit(engines ? 0 : 1);

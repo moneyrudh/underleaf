@@ -10,6 +10,8 @@ const logs = $("logs");
 const logsButton = $("toggle-logs");
 const diagnosticsEl = $("diagnostics");
 const statusEl = $("status");
+const body = $("preview-body"); // carries the busy/stale bar along its top edge
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 let currentPdf: string | null = null;
 let zoom: number | "fit" = "fit";
@@ -19,12 +21,40 @@ let renderToken = 0;
 export function setStatus(text: string, kind: "ok" | "busy" | "fail" | "info" | "" = "") {
   statusEl.textContent = text;
   statusEl.className = `status ${kind}`;
+  body.classList.toggle("busy", kind === "busy");
+}
+
+// No flashes: what's on screen stays until the next view is completely ready, then
+// swaps in one step at full opacity. Switching files or versions dims the old view
+// meanwhile; live rebuilds (you or Claude editing) don't dim at all.
+let keepScrollOnSwap = true;
+
+/** Dim the current view until the next one is ready. A different file starts at the top. */
+export function beginLoading({ keepScroll }: { keepScroll: boolean }) {
+  keepScrollOnSwap = keepScroll;
+  viewer.classList.add("loading");
+}
+
+/** Whether anything worth keeping (a page, source, image) is on screen. */
+export function hasContent() {
+  return viewer.querySelector(".pages, pre.source, img.image") !== null;
+}
+
+/** Replace the view in one step, keeping the scroll position when it's the same file. */
+function swap(el: HTMLElement) {
+  const { scrollTop, scrollLeft } = viewer;
+  viewer.classList.remove("loading");
+  viewer.replaceChildren(el);
+  viewer.scrollTop = keepScrollOnSwap ? scrollTop : 0;
+  viewer.scrollLeft = keepScrollOnSwap ? scrollLeft : 0;
+  keepScrollOnSwap = true;
 }
 
 /** Show a PDF; re-renders only when the URL changes (it carries a version). */
 export function showPdf(url: string, { stale = false } = {}) {
   viewer.classList.toggle("stale", stale);
-  if (url === currentPdf) return;
+  body.classList.toggle("stale", stale);
+  if (url === currentPdf) return void viewer.classList.remove("loading");
   currentPdf = url;
   render();
 }
@@ -34,7 +64,7 @@ export function showMessage(html: string) {
   const p = document.createElement("p");
   p.className = "message";
   p.innerHTML = html;
-  viewer.replaceChildren(p);
+  swap(p);
 }
 
 export async function showText(url: string) {
@@ -45,23 +75,24 @@ export async function showText(url: string) {
   const pre = document.createElement("pre");
   pre.className = "source";
   pre.textContent = text;
-  const { scrollTop } = viewer;
-  viewer.replaceChildren(pre);
-  viewer.scrollTop = scrollTop;
+  swap(pre);
 }
 
-export function showImage(url: string) {
+export async function showImage(url: string) {
   reset();
+  const token = renderToken;
   const img = document.createElement("img");
   img.className = "image";
   img.src = url;
-  viewer.replaceChildren(img);
+  await img.decode().catch(() => {}); // swap once it can paint, not as an empty box
+  if (token === renderToken) swap(img);
 }
 
 function reset() {
   currentPdf = null;
   renderToken++;
   viewer.classList.remove("stale");
+  body.classList.remove("stale");
 }
 
 /** Render every page off-screen, then swap in one step so the preview never flickers or loses scroll. */
@@ -73,34 +104,37 @@ async function render() {
     const pdf = await task.promise;
     const pagesEl = document.createElement("div");
     pagesEl.className = "pages";
-    const dpr = window.devicePixelRatio || 1;
     const available = viewer.clientWidth - 48;
 
     for (let n = 1; n <= pdf.numPages; n++) {
       const page = await pdf.getPage(n);
       const scale = zoom === "fit" ? available / page.getViewport({ scale: 1 }).width : zoom;
       if (n === 1) renderedScale = scale;
-      const viewport = page.getViewport({ scale: scale * dpr });
-      const canvas = document.createElement("canvas");
-      canvas.className = "page";
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
-      canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
-      await page.render({ canvas, viewport }).promise;
+      const canvas = await renderPage(page, scale);
       if (token !== renderToken) return;
       pagesEl.append(canvas);
     }
 
-    const { scrollTop, scrollLeft } = viewer;
-    viewer.replaceChildren(pagesEl);
-    viewer.scrollTop = scrollTop;
-    viewer.scrollLeft = scrollLeft;
+    swap(pagesEl);
   } catch (err) {
     if (token === renderToken) showMessage(`Couldn't render this PDF.<br><small>${String(err).replace(/</g, "&lt;")}</small>`);
   } finally {
     task.destroy();
   }
+}
+
+/** Draw one page at `scale` CSS pixels per PDF unit, sharp on high-DPI screens. */
+export async function renderPage(page: pdfjs.PDFPageProxy, scale: number): Promise<HTMLCanvasElement> {
+  const dpr = window.devicePixelRatio || 1;
+  const viewport = page.getViewport({ scale: scale * dpr });
+  const canvas = document.createElement("canvas");
+  canvas.className = "page";
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
+  canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
+  await page.render({ canvas, viewport }).promise;
+  return canvas;
 }
 
 /** Re-render at the current width (after a pane resize, for example). */
@@ -112,7 +146,7 @@ export function refit() {
 
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3];
 
-function stepZoom(dir: 1 | -1) {
+export function stepZoom(dir: 1 | -1) {
   const now = zoom === "fit" ? renderedScale : zoom;
   const next = dir > 0 ? ZOOM_STEPS.find((z) => z > now + 0.01) : [...ZOOM_STEPS].reverse().find((z) => z < now - 0.01);
   if (next === undefined) return;
@@ -122,12 +156,31 @@ function stepZoom(dir: 1 | -1) {
 
 $("zoom-in").onclick = () => stepZoom(1);
 $("zoom-out").onclick = () => stepZoom(-1);
-$("zoom-fit").onclick = () => {
+export function fitWidth() {
   zoom = "fit";
   render();
-};
+}
+$("zoom-fit").onclick = fitWidth;
 
+// ---------- keyboard scrolling ----------
+
+export type ScrollHow = "down" | "up" | "half-down" | "half-up" | "top" | "bottom";
+
+export function scroll(how: ScrollHow, el: HTMLElement = viewer) {
+  const half = el.clientHeight / 2;
+  const behavior = reduceMotion.matches ? "instant" : "smooth";
+  if (how === "top") return el.scrollTo({ top: 0, behavior });
+  if (how === "bottom") return el.scrollTo({ top: el.scrollHeight, behavior });
+  const by = { down: 70, up: -70, "half-down": half, "half-up": -half }[how];
+  el.scrollBy({ top: by, behavior: how.startsWith("half") ? behavior : "instant" });
+}
+
+// Pages are fitted to the width, so only a width change needs a re-render. Height changes
+// (the version banner appearing, for example) would otherwise re-render the same page.
+let fittedWidth = viewer.clientWidth;
 new ResizeObserver(() => {
+  if (viewer.clientWidth === fittedWidth) return;
+  fittedWidth = viewer.clientWidth;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(refit, 150);
 }).observe(viewer);
@@ -135,7 +188,23 @@ let resizeTimer: ReturnType<typeof setTimeout>;
 
 // ---------- logs ----------
 
-logsButton.onclick = () => (logs.hidden = !logs.hidden);
+export function toggleLogs() {
+  if (logsButton.hidden) return;
+  logs.hidden = !logs.hidden;
+  if (!logs.hidden) $("history").hidden = true; // one side panel at a time
+}
+logsButton.onclick = toggleLogs;
+
+/** ]e / [e: step through diagnostics, errors first. */
+let activeDiagnostic = -1;
+export function cycleDiagnostic(dir: 1 | -1) {
+  const items = [...diagnosticsEl.querySelectorAll<HTMLElement>("li.error, li.warning")];
+  if (items.length === 0 || logsButton.hidden) return;
+  logs.hidden = false;
+  activeDiagnostic = (activeDiagnostic + dir + items.length) % items.length;
+  items.forEach((li, i) => li.classList.toggle("active", i === activeDiagnostic));
+  items[activeDiagnostic]!.scrollIntoView({ block: "nearest" });
+}
 
 export function showLogsButton(visible: boolean) {
   logsButton.hidden = !visible;
@@ -147,8 +216,9 @@ export function openLogs() {
 }
 
 export function showDiagnostics(list: Diagnostic[]) {
+  activeDiagnostic = -1;
   const errors = list.filter((d) => d.severity === "error").length;
-  logsButton.textContent = list.length ? `Logs (${list.length})` : "Logs";
+  logsButton.querySelector(".label")!.textContent = list.length ? `Logs (${list.length})` : "Logs";
   logsButton.classList.toggle("has-errors", errors > 0);
 
   if (list.length === 0) {

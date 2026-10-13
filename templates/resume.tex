@@ -1,0 +1,170 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{ragged2e}
+\usepackage{soul}
+\usepackage{fontawesome}
+\input{glyphtounicode}
+
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\pdfgentounicode=1
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+
+\begin{document}
+
+\begin{center}
+\textbf{\Huge \scshape John Smith} \\ \vspace{1pt}
+\small \faMapPin \ Chicago, IL $|$ \faPhone \ (+1)555 010 1234 $|$
+    \href{mailto:john.smith@example.com}{\faEnvelope \ \ul{john.smith@example.com}} $|$
+    \href{https://example.com/}{\faExternalLinkSquare \ \ul{johnsmith.dev}}\ $|$
+    \href{https://example.com/}{\faGithub \ \ul{github}}\ $|$
+    \href{https://example.com/}{\faLinkedinSquare \ \ul{linkedin}}\
+\end{center}
+
+\section{Professional Summary}
+    \begin{itemize}[leftmargin=0.15in, rightmargin=0.15in, label={}]
+        \small{\item{
+            \begin{justify}
+            Software engineer with 4+ years of experience building backend services and web applications at scale. Comfortable across the stack with Java, Python, and TypeScript, and experienced shipping production systems on AWS. Track record of cutting service latency, improving reliability, and automating developer workflows. Looking for senior backend or platform engineering roles.
+            \end{justify}
+        }}
+    \end{itemize}
+
+\section{Work Experience}
+    \resumeSubHeadingListStart
+        \resumeSubheading
+            {Software Development Engineer II}{Seattle, WA}
+            {Amazon}{July 2023 -- Present}
+            \resumeItemListStart
+                \resumeItem{Owned the order-status service for the retail checkout team, handling 20K+ requests per second across three AWS regions}
+                \resumeItem{Reduced p99 latency from 800ms to 180ms (77\% improvement) by adding a DynamoDB read-through cache and batching downstream calls}
+                \resumeItem{Built an internal load-testing tool in Python that replaced a manual week-long process with a single nightly pipeline run}
+                \resumeItem{Led on-call runbook cleanup and alarm tuning, cutting false-positive pages by 60\%}
+            \resumeItemListEnd
+
+        \resumeSubheading
+            {Software Engineer}{Chicago, IL}
+            {Accenture}{August 2021 -- June 2023}
+            \resumeItemListStart
+                \resumeItem{Developed REST APIs in Java and Spring Boot for a client-facing insurance claims portal serving 50K+ users}
+                \resumeItem{Migrated legacy batch jobs to containerized services on Docker and Kubernetes, reducing nightly runtime by 40\%}
+                \resumeItem{Set up Jenkins CI/CD pipelines with automated testing, shortening release cycles from monthly to weekly}
+            \resumeItemListEnd
+
+        \resumeSubheading
+            {Software Engineer Intern}{Redmond, WA}
+            {Microsoft}{May 2020 -- August 2020}
+            \resumeItemListStart
+                \resumeItem{Built a React dashboard for monitoring internal build health, adopted by 4 engineering teams}
+                \resumeItem{Wrote C\# telemetry endpoints that surfaced flaky test trends, reducing investigation time by 30\%}
+            \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+\section{Projects}
+    \resumeSubHeadingListStart
+        \resumeProjectHeading
+            {{\href{https://example.com/}{\textbf{taskboard}\ \faExternalLink}}\ $|$ \textbf{Kanban-style task manager} $|$ \emph{React, TypeScript, Node.js, PostgreSQL}}{2024}
+            \resumeItemListStart
+                \resumeItem{Built a real-time collaborative task board with drag-and-drop, WebSocket sync, and role-based access}
+                \resumeItem{Designed a normalized PostgreSQL schema and REST API with pagination and full-text search}
+            \resumeItemListEnd
+        \resumeProjectHeading
+            {{\href{https://example.com/}{\textbf{weathernow}\ \faExternalLink}}\ $|$ \textbf{Weather forecast dashboard} $|$ \emph{Next.js, Python, FastAPI, Redis}}{2023}
+            \resumeItemListStart
+                \resumeItem{Aggregated forecasts from multiple public APIs into a single dashboard with hourly and 7-day views}
+                \resumeItem{Added a Redis caching layer that reduced third-party API calls by 85\%}
+            \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+\section{Education}
+    \resumeSubHeadingListStart
+        \resumeSubheading
+            {State University}{Springfield, IL}
+            {Bachelor of Science, Computer Science}{Aug 2017 -- May 2021}
+            \resumeItemListStart
+                \resumeItem{Cumulative GPA: 3.6/4.0}
+                \resumeItem{Coursework: Data Structures, Algorithms, Operating Systems, Databases, Computer Networks}
+            \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+\section{Technical Skills}
+    \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+        \textbf{Languages}{: Java, Python, TypeScript, JavaScript, C\#, SQL} \\
+        \textbf{Frameworks/Tools}{: React, Next.js, Node.js, Spring Boot, FastAPI, Docker, Kubernetes, Jenkins, Git} \\
+        \textbf{Cloud Technologies}{: Amazon Web Services (AWS), Microsoft Azure} \\
+        \textbf{Databases}{: PostgreSQL, MySQL, DynamoDB, MongoDB, Redis} \\
+        \textbf{Soft Skills}{: Communication, Mentoring, Problem-solving, Ownership}
+    }}
+    \end{itemize}
+
+\end{document}

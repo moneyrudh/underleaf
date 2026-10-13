@@ -336,3 +336,8 @@ build/
 # your own documents and exported PDFs stay local
 latex/
 resumes/
+
+.DS_Store
+
+# local planning notes (roadmap, checklists)
+notes/
