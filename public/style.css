@@ -326,7 +326,7 @@ kbd {
 .palette li.empty { color: var(--chrome-muted); cursor: default; }
 .palette mark { background: none; color: var(--accent); font-weight: 600; }
 
-.sheet { width: min(760px, 100%); }
+.sheet { width: min(940px, 100%); }
 .sheet-head {
   display: flex;
   justify-content: space-between;
@@ -335,10 +335,11 @@ kbd {
   border-bottom: 1px solid var(--chrome-line);
   font-weight: 600;
 }
-.sheet-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 4px 24px; padding: 14px 16px 18px; }
+.sheet-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 4px 28px; padding: 14px 16px 18px; }
 .sheet h3 { margin: 6px 0 8px; font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--chrome-muted); }
 .sheet dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; margin: 0; font-size: 13px; align-items: center; }
 .sheet dt { display: flex; gap: 3px; justify-content: flex-end; }
+.sheet dt .or { color: var(--chrome-muted); font-size: 11px; margin: 0 1px; align-self: center; }
 .sheet dd { margin: 0; color: #c9d4cc; }
 
 /* ---------- leader chip ---------- */

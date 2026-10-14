@@ -9,7 +9,8 @@
     "dev:ui": "UNDERLEAF_DEV=1 bun src/server.ts",
     "pdf": "bun src/cli.ts pdf",
     "doctor": "bun src/cli.ts doctor",
-    "typecheck": "bunx --bun tsc --noEmit"
+    "typecheck": "bunx --bun tsc --noEmit",
+    "smoke": "bun scripts/smoke.ts"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
