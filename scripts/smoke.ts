@@ -10,7 +10,8 @@
 import os from "node:os";
 import path from "node:path";
 import { chmod, cp, mkdir, mkdtemp, rm } from "node:fs/promises";
-import { REPO } from "../src/compile";
+import { REPO } from "../src/repo";
+import { API, url } from "../shared/protocol";
 
 const KEEP = process.argv.includes("--keep");
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
@@ -47,7 +48,7 @@ await chmod(fakeClaude, 0o755);
 // History with a few versions: init → two edits. history.ts reads UNDERLEAF_HOME when it's
 // loaded, so set it first and import afterwards (never touch the real ~/.underleaf).
 process.env.UNDERLEAF_HOME = home;
-const { HistoryStore, editLabel } = await import("../src/history");
+const { HistoryStore, editLabel } = await import("../src/history/store");
 const store = (await HistoryStore.open(latex))!;
 const replace = async (from: string, to: string) => {
   const text = await Bun.file(main).text();
@@ -146,6 +147,21 @@ function expect(ok: unknown, message: string) {
 }
 
 console.log(`underleaf smoke test  (${tmp})\n`);
+
+await check("every element id the code looks up exists in index.html", async () => {
+  const html = await Bun.file(path.join(REPO, "public", "index.html")).text();
+  const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]!));
+  const missing: string[] = [];
+  for await (const file of new Bun.Glob("public/**/*.ts").scan({ cwd: REPO })) {
+    const code = await Bun.file(path.join(REPO, file)).text();
+    for (const m of code.matchAll(/\$(?:<[^>]+>)?\("([\w-]+)"\)|getElementById\("([\w-]+)"\)/g)) {
+      const id = (m[1] ?? m[2])!;
+      if (!ids.has(id)) missing.push(`${id} (${file})`);
+    }
+  }
+  expect(missing.length === 0, `not in index.html: ${missing.join(", ")}`);
+});
+
 await cdp.send("Page.navigate", { url: `http://localhost:${port}/#latex/main.tex` });
 
 await check("opens and compiles the document", async () => {
@@ -252,7 +268,7 @@ await check("command palette (mod+shift+P) runs a command", async () => {
 await check("Claude hooks: a turn becomes one labelled snapshot; a wrong token is refused", async () => {
   const token = await Bun.file(tokenFile).text();
   const hook = (event: string, body: object, t = token) =>
-    fetch(`http://localhost:${port}/api/hooks/claude?event=${event}`, {
+    fetch(`http://localhost:${port}${url(API.claudeHook, { event })}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Underleaf-Token": t },
       body: JSON.stringify(body),
@@ -263,7 +279,7 @@ await check("Claude hooks: a turn becomes one labelled snapshot; a wrong token i
   await Bun.sleep(400);
   expect((await hook("stop", {})).status === 204, "stop hook failed");
   const labels = async () =>
-    ((await (await fetch(`http://localhost:${port}/api/history?path=latex/main.tex`)).json()) as { snapshots: { label: string }[] }).snapshots.map((s) => s.label);
+    ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.map((s) => s.label);
   await until(async () => (await labels()).includes("Claude: Make the summary punchier"), 10_000, "Claude snapshot");
   expect((await labels()).some((l) => l.startsWith("Exported resumes/main.pdf")), "no export snapshot from Save PDF");
 });
