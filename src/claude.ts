@@ -74,7 +74,7 @@ export class ClaudeSession {
   }
 
   private async start(start: ClaudeStart) {
-    const bin = Bun.which("claude");
+    const bin = process.env.UNDERLEAF_CLAUDE_BIN ?? Bun.which("claude"); // the override is for tests (a stand-in CLI)
     if (!bin) {
       this.emit(
         "\x1b[33mClaude Code isn't installed.\x1b[0m\r\n\r\n" +
