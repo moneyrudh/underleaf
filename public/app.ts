@@ -1,21 +1,23 @@
-import { label } from "./keys";
-import { installHints } from "./hints";
-import { initLayout, focusPane } from "./layout";
-import { initOpening } from "./open";
-import { initCheatsheet } from "./cheatsheet";
-import { installCommands } from "./commands";
-import { connect } from "./connection";
-import { storage } from "./util";
+import { label } from "./core/keys";
+import { installHints } from "./ui/hints";
+import { initLayout, focusPane } from "./core/layout";
+import { initOpening } from "./files/open";
+import { initCheatsheet } from "./ui/cheatsheet";
+import { installCommands } from "./core/commands";
+import { connect } from "./core/connection";
+import { STORED, storage } from "./core/util";
 
 /**
- * underleaf's page: file tree | Claude Code | preview.
- *   state.ts       what's open, shared by everything below
- *   connection.ts  websocket to the server (tree, builds, history)
- *   open.ts        opening files, the preview toolbar, export, quick-open
- *   versions.ts    viewing and restoring earlier versions
- *   compare.ts     comparing versions or files (the view is diff.ts)
- *   layout.ts      panes, focus, zoom, splitters, the Claude terminal
- *   commands.ts    every command and shortcut; cheatsheet.ts renders them
+ * underleaf's page: file tree | Claude Code | preview. One folder per feature:
+ *   core/      state (what's open), connection (websocket), commands (every command and
+ *              shortcut), keys, layout (panes, focus, splitters), util
+ *   files/     the file tree and opening files (export, quick-open, mentions)
+ *   preview/   the PDF / image / source viewer
+ *   history/   the version bar and History panel, viewing and restoring versions
+ *   compare/   comparing versions or files: the view, the diff, pixel measuring
+ *   claude/    the Claude Code terminal
+ *   ui/        reusable pieces: palette, dropdown menu, key hints, cheat sheet
+ * Types and messages shared with the server live in ../shared/.
  */
 
 initLayout();
@@ -25,4 +27,4 @@ installCommands();
 for (const kbd of document.querySelectorAll<HTMLElement>("kbd[data-key]")) kbd.textContent = label(kbd.dataset.key!);
 installHints();
 connect();
-focusPane(storage("claude-pane") !== "0" ? "claude" : "tree");
+focusPane(storage(STORED.claudePane) !== "0" ? "claude" : "tree");

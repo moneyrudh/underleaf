@@ -1,6 +1,8 @@
 import path from "node:path";
 import { copyFile } from "node:fs/promises";
-import { compile, ENGINES, REPO } from "./compile";
+import { compile } from "./build/compile";
+import { ENGINES } from "../shared/types";
+import { REPO } from "./repo";
 
 const [command, ...rest] = process.argv.slice(2);
 

@@ -134,7 +134,7 @@ The server only listens on `127.0.0.1`, and it rejects requests from other origi
 
 ## How it works
 
-The server (`src/`) watches `latex/` and `resumes/`, compiles through `src/compile.ts` into `build/`, runs Claude Code through `src/claude.ts`, and talks to the browser over WebSockets; `src/server.ts` lists the pieces. `bun run smoke` runs an end-to-end check in headless Chrome. The UI in `public/` renders PDFs with [pdf.js](https://mozilla.github.io/pdf.js/) and the terminal with [xterm.js](https://xtermjs.org/).
+The server (`src/`) watches `latex/` and `resumes/`, compiles through `src/build/compile.ts` into `build/`, runs Claude Code through `src/claude/session.ts`, and talks to the browser over WebSockets; `src/server.ts` lists the pieces. `bun run smoke` runs an end-to-end check in headless Chrome. The UI in `public/` renders PDFs with [pdf.js](https://mozilla.github.io/pdf.js/) and the terminal with [xterm.js](https://xtermjs.org/).
 
 ---
 

@@ -1,23 +1,24 @@
 import path from "node:path";
-import { ENGINES, REPO } from "./compile";
-import { LATEX, OPEN_BROWSER, PORT, RESUMES } from "./config";
-import { build } from "./builds";
-import { claude } from "./clients";
-import { flushEditSnapshot, openHistory } from "./snapshots";
-import { docs, rescan, scheduleBrief } from "./trees";
-import { startWatching } from "./watch";
-import { startServer } from "./routes";
-import { ensureClaudeHooks, seedWorkspace } from "./workspace";
+import { ENGINES } from "../shared/types";
+import { REPO } from "./repo";
+import { LATEX, OPEN_BROWSER, PORT, RESUMES } from "./server/config";
+import { build } from "./build/builds";
+import { claude } from "./server/clients";
+import { flushEditSnapshot, openHistory } from "./history/snapshots";
+import { docs, rescan, scheduleBrief } from "./server/trees";
+import { startWatching } from "./server/watch";
+import { startServer } from "./server/routes";
+import { ensureClaudeHooks, seedWorkspace } from "./workspace/seed";
 
 /**
  * Startup. The pieces:
- *   config.ts     arguments and folders
- *   trees.ts      the scanned folders, and the workspace brief for Claude
- *   builds.ts     compiling documents, last good PDFs, export
- *   snapshots.ts  when version history snapshots are taken
- *   watch.ts      reacting to files changing on disk
- *   clients.ts    browser tabs and the shared Claude Code session
- *   routes.ts     HTTP and websockets
+ *   server/     config (args, folders), routes (HTTP + websockets), clients (tabs and the
+ *               shared Claude session), watch (files changing on disk), trees (scanned folders)
+ *   build/      compile (one LaTeX build), builds (per-document queue, last good PDF, export)
+ *   history/    store (git-backed snapshots), snapshots (when they're taken)
+ *   workspace/  files (scanning, kinds, watching), seed (templates, Claude hooks)
+ *   claude/     session (the claude CLI in a PTY), brief (workspace.md for Claude)
+ * Types and messages shared with the page live in ../shared/.
  */
 
 if (!ENGINES.some((e) => Bun.which(e))) {
