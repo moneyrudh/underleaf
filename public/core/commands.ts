@@ -81,7 +81,7 @@ export const COMMANDS: Command[] = [
   { title: "Previous error", keys: ["[ e"], scope: "preview", run: () => preview.cycleDiagnostic(-1), palette: false, sheet: "Next / previous error" },
   { title: "Toggle logs", keys: ["L"], scope: "preview", run: preview.toggleLogs, when: isDoc },
   { title: "Version history", keys: ["H"], scope: "preview", run: () => versions.toggle(), when: inLatex },
-  { id: "version-bar", title: "Toggle version bar", keys: ["V"], scope: "preview", run: () => versions.toggleStrip(), when: () => state.historyEnabled },
+  { id: "version-bar", title: "Toggle version bar", keys: ["V"], scope: "preview", run: () => versions.toggleStrip(), when: () => versions.enabled }, // the bar only exists for files with history
   { title: "Older version", keys: [","], scope: "preview", run: () => versions.step(-1), when: () => state.historyEnabled, sheet: "Older / newer version" },
   { title: "Newer version", keys: ["."], scope: "preview", run: () => versions.step(1), when: () => state.historyEnabled, sheet: "Older / newer version" },
   { id: "compare-previous", title: "Compare with previous version", keys: ["C"], scope: "preview", run: toggleCompare, when: () => versions.enabled && canCompare() && !diffView.active },

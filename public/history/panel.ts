@@ -106,6 +106,7 @@ export class HistoryPanel {
 
   /** Show or hide the version strip (remembered). */
   toggleStrip() {
+    if (!this.available) return; // no version bar for this file: don't silently change the saved setting
     this.stripOn = !this.stripOn;
     storage(STORED.versionStrip, this.stripOn ? "1" : "0");
     this.refresh();

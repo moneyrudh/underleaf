@@ -119,7 +119,7 @@ async function press(key: string, modifiers: string[] = []) {
   let mods = modifiers.reduce((m, k) => m | bits[k]!, 0);
   if (/^[A-Z]$/.test(key)) mods |= 8;
   const code =
-    { Escape: "Escape", Enter: "Enter", ",": "Comma", ".": "Period", "]": "BracketRight", "[": "BracketLeft" }[key] ??
+    { Escape: "Escape", Enter: "Enter", ",": "Comma", ".": "Period", "]": "BracketRight", "[": "BracketLeft", "+": "Equal", "=": "Equal" }[key] ??
     (/^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : key);
   const vk = { Escape: 27, Enter: 13, ",": 188, ".": 190, "]": 221, "[": 219 }[key] ?? key.toUpperCase().charCodeAt(0);
   const printable = key.length === 1 && !(mods & 6);
@@ -181,8 +181,22 @@ await check("zoom menu: a preset changes the zoom and its label", async () => {
   await waitFor("document.getElementById('zoom-label').textContent === 'Fit'", "back to Fit");
 });
 
+await check("a shortcut closes an open menu, and keys work right after", async () => {
+  await click("#zoom-menu-btn");
+  await waitFor("!document.getElementById('zoom-menu').hidden", "zoom menu");
+  await press("p", [MOD]);
+  await waitFor("document.getElementById('zoom-menu').hidden && !document.getElementById('palette').hidden", "menu closed, palette open");
+  await press("Escape");
+  await waitFor("document.getElementById('palette').hidden", "palette closed");
+  await focusPreview();
+  await press("+");
+  await waitFor("document.getElementById('zoom-label').textContent !== 'Fit'", "+ zoomed in");
+  await press("=");
+  await waitFor("document.getElementById('zoom-label').textContent === 'Fit'", "= back to Fit");
+});
+
 await check("agent files: hidden by default, one click shows them", async () => {
-  await waitFor("/2 agent files hidden/.test(document.getElementById('tree-foot').textContent)", "the hidden-files line");
+  await waitFor("/\\d+ agent files hidden/.test(document.getElementById('tree-foot').textContent)", "the hidden-files line");
   await click("#agent-toggle");
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'CLAUDE.md')", "CLAUDE.md listed");
   await click("#agent-toggle");

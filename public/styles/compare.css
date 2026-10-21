@@ -1,19 +1,24 @@
 /* Comparing versions or files. The compare bar takes over from the preview toolbar. */
 
 .preview-pane:has(.viewer-col.comparing) > .toolbar { display: none; }
+/* One row when there's room; at narrower widths the pickers get the first row and the controls wrap
+   to a second, instead of everything squeezing until it's unreadable or clipped. */
 .compare-bar {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  height: var(--bar-h);
-  padding: 0 8px 0 10px;
+  min-height: var(--bar-h);
+  padding: 7px 8px 7px 10px;
   border-bottom: 1px solid var(--line);
   flex: none;
 }
 .preview-pane[data-focused] > .compare-bar::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--leaf); }
 .viewer-col.comparing .snapshot-banner { display: none; } /* the compare bar says what's on screen */
-.compare-sides { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 320px; }
+.compare-sides { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 300px; }
+.compare-bar .status { flex: none; max-width: none; }
+.compare-bar .spacer { flex: 1 0 0; }
 .compare-sides .arrow { color: var(--muted); flex: none; }
 .compare-names { overflow: hidden; text-overflow: ellipsis; white-space: pre; font-weight: 500; }
 
@@ -114,3 +119,6 @@
 .src-fold:hover { color: var(--ink); }
 
 @media (prefers-color-scheme: dark) { .hl { mix-blend-mode: normal; } }
+
+/* Very narrow: drop the shortcut chips so the controls fit one row under the pickers. */
+@container preview (max-width: 440px) { .compare-bar kbd.k { display: none; } }

@@ -9,15 +9,17 @@
   --ink: #17201a;
   --muted: #637268;
   --faint: #8d998f;
-  --leaf: #2e8b52;          /* accent */
-  --leaf-strong: #237245;
-  --leaf-soft: rgb(46 139 82 / 0.12);
+  --leaf: #267a48;          /* accent; dark enough for white text and for text on white (≥ 4.5:1) */
+  --leaf-strong: #1d623a;
+  --leaf-soft: rgb(38 122 72 / 0.12);
   --on-leaf: #ffffff;
   --desk: #e4e2db;          /* behind the paper */
   --grain: rgb(0 0 0 / 0.035);
   --error: #c8382f;
-  --warn: #a8700f;
-  --warn-soft: rgb(168 112 15 / 0.12);
+  --on-error: #ffffff;      /* text on an --error fill */
+  --warn: #8a5a08;
+  --on-warn: #ffffff;       /* text on a --warn fill */
+  --warn-soft: rgb(138 90 8 / 0.12);
   --kind-claude: #c4743c;
   --kind-restore: #3f78c4;
   --add: rgb(46 160 82 / 0.30);
@@ -62,7 +64,9 @@
     --desk: #232825;
     --grain: rgb(255 255 255 / 0.025);
     --error: #ff7b72;
+    --on-error: #2b0c0a;
     --warn: #e0a83a;
+    --on-warn: #1d1304;
     --warn-soft: rgb(224 168 58 / 0.14);
     --kind-claude: #e09a62;
     --kind-restore: #7aa7e0;

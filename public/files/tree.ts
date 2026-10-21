@@ -60,9 +60,9 @@ export class FileTree {
     return [...this.nodes.values()].filter((n): n is FileNode => n.type === "file" && this.listed(n.path));
   }
 
-  /** How many of the agent's top-level entries (CLAUDE.md, memory/) exist, shown or not. */
+  /** How many agent files exist (CLAUDE.md and everything in memory/), shown or not. */
   get agentFileCount() {
-    return [...this.nodes.keys()].filter((p) => p === "latex/CLAUDE.md" || p === "latex/memory").length;
+    return [...this.nodes.values()].filter((n) => n.type === "file" && isAgentPath(n.path)).length;
   }
 
   get agentFilesVisible() {

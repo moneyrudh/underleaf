@@ -105,7 +105,7 @@ export function open(file: FileNode) {
     preview.showText(fileUrl);
     if (file.kind === "tex") preview.setStatus("Part of another document", "info", "No \\documentclass: this file is included by another one, so it's shown as source.");
   } else {
-    preview.showMessage(`No preview for <strong>${escapeHtml(file.name)}</strong>.<br>Use ⤓ to download it.`);
+    preview.showMessage(`No preview for <strong>${escapeHtml(file.name)}</strong>.<br>Download it from the ⋯ menu.`);
   }
 }
 

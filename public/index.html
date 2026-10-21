@@ -19,10 +19,10 @@
         <span>Go to file or command</span><kbd data-key="mod+p"></kbd>
       </button>
       <div class="tb-right">
-        <button id="toggle-tree" class="ibtn on" data-tip="Show or hide files · focus them with" data-key="LEADER 1" aria-label="Show or hide files">
+        <button id="toggle-tree" class="ibtn on" aria-pressed="true" data-tip="Show or hide files · focus them with" data-key="LEADER 1" aria-label="Show or hide files">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M6 2.5v11" /></svg>
         </button>
-        <button id="toggle-claude" class="ibtn on" data-tip="Show or hide Claude · focus it with" data-key="LEADER 2" aria-label="Show or hide Claude">
+        <button id="toggle-claude" class="ibtn on" aria-pressed="true" data-tip="Show or hide Claude · focus it with" data-key="LEADER 2" aria-label="Show or hide Claude">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M5 6.5 7 8 5 9.5M8.5 10h3" /></svg>
         </button>
         <button id="help" class="ibtn" data-tip="Keyboard shortcuts" data-key="?" aria-label="Keyboard shortcuts">
@@ -65,18 +65,18 @@
       <section id="preview-pane" class="pane preview-pane" tabindex="0">
         <div class="pane-head toolbar">
           <span id="preview-title" class="pane-title file">Preview</span>
-          <span id="status" class="status"></span>
+          <span id="status" class="status" role="status"></span>
           <span class="spacer"></span>
           <div id="zoom" class="menu-wrap">
             <button id="zoom-menu-btn" class="select" aria-haspopup="menu" aria-controls="zoom-menu" data-tip="Zoom">
               <span id="zoom-label">Fit</span><span class="chev">▾</span>
             </button>
             <div id="zoom-menu" class="popover" role="menu" hidden>
-              <button id="zoom-fit" role="menuitem" data-key="=">Fit width</button>
+              <button id="zoom-fit" role="menuitemradio" data-key="=">Fit width</button>
               <hr />
-              <button role="menuitem" data-zoom="0.75">75%</button>
-              <button role="menuitem" data-zoom="1">100%</button>
-              <button role="menuitem" data-zoom="1.5">150%</button>
+              <button role="menuitemradio" data-zoom="0.75">75%</button>
+              <button role="menuitemradio" data-zoom="1">100%</button>
+              <button role="menuitemradio" data-zoom="1.5">150%</button>
               <hr />
               <button id="zoom-in" role="menuitem" data-key="+">Zoom in</button>
               <button id="zoom-out" role="menuitem" data-key="-">Zoom out</button>
@@ -113,7 +113,7 @@
             <button id="compare-b" class="picker" aria-haspopup="listbox" aria-label="After"></button>
             <span id="compare-names" class="compare-names" hidden></span>
           </div>
-          <span id="compare-status" class="status"></span>
+          <span id="compare-status" class="status" role="status"></span>
           <span class="spacer"></span>
           <div class="seg" role="group" aria-label="Compare">
             <button id="compare-reader" data-key="S">Reader</button>

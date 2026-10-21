@@ -111,4 +111,4 @@
 }
 .snapshot-banner .snapshot-what { min-width: 0; flex: 1 1 220px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .snapshot-banner .ghost { border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
-.snapshot-banner .ghost.armed { background: var(--error); border-color: var(--error); color: #fff; }
+.snapshot-banner .ghost.armed { background: var(--error); border-color: var(--error); color: var(--on-error); }

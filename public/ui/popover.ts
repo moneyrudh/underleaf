@@ -35,7 +35,7 @@ export function installPopovers(hooks: Hooks) {
       open(button, menu, hooks);
     });
     menu.addEventListener("click", (e) => {
-      const item = (e.target as Element).closest<HTMLElement>("[role='menuitem']");
+      const item = (e.target as Element).closest<HTMLElement>(ITEM);
       if (!item) return;
       e.stopPropagation();
       closePopover({ focusButton: true });
@@ -58,11 +58,21 @@ export function installPopovers(hooks: Hooks) {
     if (openMenu && !openMenu.menu.contains(e.target as Node)) closePopover();
   });
   window.addEventListener("blur", () => closePopover());
+  // A shortcut (⌘P, ⌘S, the leader…) means you've moved on. This runs after the keymap's own
+  // capture listener, so the shortcut still does its job; the menu just gets out of the way.
+  window.addEventListener("keydown", (e) => (e.metaKey || e.ctrlKey || e.altKey) && closePopover(), true);
+  // So does focus leaving the menu (the palette opening, Tab, a click elsewhere).
+  document.addEventListener("focusout", (e) => {
+    if (!openMenu) return;
+    const to = e.relatedTarget as Node | null;
+    if (openMenu.menu.contains(e.target as Node) && !openMenu.menu.contains(to) && !openMenu.button.contains(to)) closePopover();
+  });
 }
 
 function open(button: HTMLElement, menu: HTMLElement, hooks: Hooks) {
   closePopover();
   for (const item of menu.querySelectorAll<HTMLElement>("[data-command]")) item.hidden = !hooks.available(item.dataset.command!);
+  if (visibleItems(menu).length === 0) return; // nothing applies right now: no empty box
   tidySeparators(menu);
   menu.hidden = false;
   button.setAttribute("aria-expanded", "true");
@@ -86,4 +96,5 @@ function tidySeparators(menu: HTMLElement) {
   }
 }
 
-const visibleItems = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLElement>("[role='menuitem']")].filter((i) => !i.hidden);
+const ITEM = "[role='menuitem'], [role='menuitemradio']";
+const visibleItems = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLElement>(ITEM)].filter((i) => !i.hidden);

@@ -24,8 +24,16 @@ export function setStatus(text: string, kind: "ok" | "busy" | "fail" | "info" | 
   for (const el of [statusEl, compareStatusEl]) {
     el.textContent = text;
     el.className = `status ${kind}`;
-    if (details) el.dataset.tip = details;
-    else delete el.dataset.tip;
+    // Details live in the tooltip; the chip takes focus so keyboard and screen-reader users reach them too.
+    if (details) {
+      el.dataset.tip = details;
+      el.tabIndex = 0;
+      el.setAttribute("aria-label", `${text}. ${details}`);
+    } else {
+      delete el.dataset.tip;
+      el.removeAttribute("tabindex");
+      el.removeAttribute("aria-label");
+    }
   }
   body.classList.toggle("busy", kind === "busy");
 }
@@ -246,7 +254,8 @@ export function showDiagnostics(list: Diagnostic[]) {
   badge.hidden = list.length === 0;
   badge.textContent = list.length > 99 ? "99+" : String(list.length);
   badge.classList.toggle("error", errors > 0);
-  logsButton.setAttribute("aria-label", list.length ? `Logs: ${errors} errors, ${list.length - errors} warnings` : "Logs");
+  const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  logsButton.setAttribute("aria-label", list.length ? `Logs: ${count(errors, "error")}, ${count(list.length - errors, "warning")}` : "Logs");
 
   if (list.length === 0) {
     const li = document.createElement("li");

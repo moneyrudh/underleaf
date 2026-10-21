@@ -37,7 +37,7 @@
 .pane:focus { outline: none; }
 .tree-pane { width: var(--tree-w); flex: none; background: var(--chrome); }
 .claude-pane { width: var(--claude-w); flex: none; background: var(--term); color: var(--term-ink); }
-.preview-pane { flex: 1; background: var(--chrome); }
+.preview-pane { flex: 1; background: var(--chrome); container: preview / inline-size; } /* bars adapt to the pane's width */
 
 .pane-head {
   position: relative;

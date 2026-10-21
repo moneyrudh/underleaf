@@ -1,7 +1,11 @@
 /* The preview: toolbar, status, the desk the pages sit on, Logs. */
 
 .toolbar { border-bottom: 1px solid var(--line); overflow: visible; } /* its menus hang below it */
-.toolbar .pane-title.file { font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); max-width: 36ch; }
+.toolbar .pane-title.file { font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); max-width: 36ch; min-width: 6ch; }
+/* A narrow preview drops what matters least first: the status chip (its line is in the tooltip and
+   the pane's aria), then the shortcut chip on Save PDF. The file name never shrinks to nothing. */
+@container preview (max-width: 560px) { .toolbar .status { display: none; } }
+@container preview (max-width: 440px) { .toolbar .primary kbd.k { display: none; } }
 .preview-pane:not([data-focused]) .toolbar .pane-title.file { color: var(--muted); }
 
 /* One status chip: a colored dot and one short line. Details are in its tooltip. */

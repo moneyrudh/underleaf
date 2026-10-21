@@ -6,7 +6,7 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 60;
+  z-index: 45; /* below the palette and cheat sheet (50) */
   display: grid;
   min-width: 220px;
   padding: 4px;
@@ -15,7 +15,7 @@
   border-radius: 9px;
   box-shadow: var(--shadow-pop);
 }
-.popover [role="menuitem"] {
+.popover [role="menuitem"], .popover [role="menuitemradio"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -30,14 +30,14 @@
   text-decoration: none;
   cursor: pointer;
 }
-.popover [role="menuitem"]:hover, .popover [role="menuitem"]:focus-visible { background: var(--leaf-soft); outline: none; }
-.popover [role="menuitem"][aria-checked="true"]::after { content: "✓"; color: var(--leaf); }
+.popover [role^="menuitem"]:hover, .popover [role^="menuitem"]:focus-visible { background: var(--leaf-soft); outline: none; }
+.popover [role="menuitemradio"][aria-checked="true"]::after { content: "✓"; color: var(--leaf); }
 .popover hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 
 /* Dropdown list with a filter (compare pickers). */
 .menu {
   position: fixed;
-  z-index: 70;
+  z-index: 45; /* below the palette and cheat sheet (50) */
   display: flex;
   flex-direction: column;
   background: var(--panel);
