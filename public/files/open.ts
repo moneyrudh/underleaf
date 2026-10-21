@@ -2,6 +2,7 @@ import { FileTree } from "./tree";
 import * as preview from "../preview/preview";
 import { openPalette } from "../ui/palette";
 import { send } from "../core/connection";
+import { paletteCommands } from "../core/commands";
 import { leaveSnapshot, versions } from "../history/versions";
 import { closeCompare, diffView } from "../compare/compare";
 import { claude, focusPane } from "../core/layout";
@@ -17,6 +18,7 @@ let firstTree = true;
 
 export function initOpening() {
   ui.exportButton.onclick = exportPdf;
+  $("agent-toggle").onclick = () => toggleAgentFiles(!tree.agentFilesVisible);
   $("quick-open").onclick = quickOpen;
   window.addEventListener("hashchange", () => {
     const file = tree.find(decodeURIComponent(location.hash.slice(1)));
@@ -26,6 +28,8 @@ export function initOpening() {
 
 export function onTree(trees: DirNode[]) {
   tree.update(trees);
+  showWorkspace();
+  showAgentFoot();
 
   if (firstTree) {
     firstTree = false;
@@ -86,7 +90,7 @@ export function open(file: FileNode) {
     if (switching) {
       state.lastPdf = null;
       ui.exportButton.disabled = true;
-      preview.setStatus("compiling…", "busy");
+      preview.setStatus("Building…", "busy");
       if (!preview.hasContent()) preview.showMessage("Compiling…"); // nothing to keep on screen meanwhile
     }
     send({ type: "open", doc: file.path });
@@ -99,7 +103,7 @@ export function open(file: FileNode) {
   else if (file.kind === "image") preview.showImage(fileUrl);
   else if (file.kind === "tex" || file.kind === "text") {
     preview.showText(fileUrl);
-    if (file.kind === "tex") preview.setStatus("no \\documentclass — included by another file, shown as source", "info");
+    if (file.kind === "tex") preview.setStatus("Part of another document", "info", "No \\documentclass: this file is included by another one, so it's shown as source.");
   } else {
     preview.showMessage(`No preview for <strong>${escapeHtml(file.name)}</strong>.<br>Use ⤓ to download it.`);
   }
@@ -119,6 +123,28 @@ export function showNothing() {
   preview.showLogsButton(false);
   preview.setStatus("");
   preview.showMessage("Pick a file on the left, or ask Claude to create a <code>.tex</code> file in <code>latex/</code>.");
+}
+
+/** The title bar names the folder you're working in ("~/Documents/thesis"). */
+function showWorkspace() {
+  const dir = state.roots.latex;
+  if (!dir) return;
+  $("workspace-name").textContent = dir.replace(/^\/(?:Users|home)\/[^/]+/, "~");
+}
+
+/** "2 agent files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */
+function showAgentFoot() {
+  const n = tree.agentFileCount;
+  $("tree-foot").hidden = n === 0;
+  $("agent-count").textContent = tree.agentFilesVisible ? `Agent files shown` : `${n} agent file${n === 1 ? "" : "s"} hidden`;
+  $("agent-toggle").textContent = tree.agentFilesVisible ? "Hide" : "Show";
+}
+
+export function toggleAgentFiles(visible: boolean) {
+  tree.setAgentFilesVisible(visible);
+  showAgentFoot();
+  toast(visible ? "Agent files shown: CLAUDE.md and memory/" : "Agent files hidden");
+  if (visible) focusPane("tree");
 }
 
 // ---------- acting on files ----------
@@ -166,9 +192,10 @@ export function quickOpen() {
     return i < 0 ? Infinity : i;
   };
   const files = tree.files().sort((a, b) => rank(a.path) - rank(b.path) || a.path.localeCompare(b.path));
+  // Files first (most recent on top), then commands, so one search box reaches both.
   openPalette({
-    placeholder: "Go to file…",
-    emptyText: "No matching files",
-    items: files.map((f) => ({ label: f.path, run: () => open(f) })),
+    placeholder: "Go to file or command…",
+    emptyText: "No matching files or commands",
+    items: [...files.map((f) => ({ label: f.path, run: () => open(f) })), ...paletteCommands()],
   });
 }

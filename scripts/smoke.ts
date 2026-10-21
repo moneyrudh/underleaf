@@ -166,9 +166,27 @@ await cdp.send("Page.navigate", { url: `http://localhost:${port}/#latex/main.tex
 
 await check("opens and compiles the document", async () => {
   await waitFor("document.querySelectorAll('#viewer canvas.page').length > 0", "first PDF page", 20_000);
-  expect((await status()).startsWith("compiled"), `status: ${await status()}`);
+  expect((await status()).startsWith("Built"), `status: ${await status()}`);
   const files = await js<string>("[...document.querySelectorAll('#tree .row .name')].map(n => n.textContent).join(',')");
   expect(files.includes("main.tex") && files.includes("notes.md"), `tree: ${files}`);
+});
+
+await check("zoom menu: a preset changes the zoom and its label", async () => {
+  await click("#zoom-menu-btn");
+  await waitFor("!document.getElementById('zoom-menu').hidden", "zoom menu");
+  await click("[data-zoom='1.5']");
+  await waitFor("document.getElementById('zoom-label').textContent === '150%' && document.getElementById('zoom-menu').hidden", "150% and menu closed");
+  await click("#zoom-menu-btn");
+  await click("#zoom-fit");
+  await waitFor("document.getElementById('zoom-label').textContent === 'Fit'", "back to Fit");
+});
+
+await check("agent files: hidden by default, one click shows them", async () => {
+  await waitFor("/2 agent files hidden/.test(document.getElementById('tree-foot').textContent)", "the hidden-files line");
+  await click("#agent-toggle");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'CLAUDE.md')", "CLAUDE.md listed");
+  await click("#agent-toggle");
+  await waitFor("![...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'CLAUDE.md')", "hidden again");
 });
 
 await check("Claude pane runs the CLI in a terminal", async () => {
@@ -186,6 +204,17 @@ await check("views an earlier version, Esc goes back", async () => {
   await focusPreview();
   await press("Escape");
   await waitFor("document.getElementById('snapshot-banner').hidden", "banner closed");
+});
+
+await check("⋯ menu: lists what applies, and runs it (compare)", async () => {
+  await click("#more-btn");
+  await waitFor("!document.getElementById('more-menu').hidden", "more menu");
+  const items = await js<string>("[...document.querySelectorAll('#more-menu [role=menuitem]')].filter(i => !i.hidden).map(i => i.textContent.trim()).join(' | ')");
+  expect(items.includes("Compare with previous version") && items.includes("Hide version bar"), `items: ${items}`);
+  await click("#more-menu [data-command='compare-previous']");
+  await waitFor("!document.getElementById('compare-bar').hidden && /change/i.test(document.getElementById('compare-status').textContent)", "comparison from the menu", 20_000);
+  await press("Escape");
+  await waitFor("document.getElementById('compare-bar').hidden", "comparison closed");
 });
 
 await check("compares with the previous version (C)", async () => {
@@ -217,7 +246,7 @@ await check("live edit recompiles and shows in a comparison", async () => {
   const before = builds();
   await replace("Built an internal load-testing tool", "Built a distributed load-testing tool");
   await until(() => builds() > before, 20_000, "a rebuild after the edit");
-  await waitFor("document.getElementById('status').textContent.startsWith('compiled')", "compiled status");
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "built status");
   await focusPreview();
   await press("C");
   await waitFor("/change/.test(document.getElementById('status').textContent) && !document.getElementById('compare-bar').hidden", "comparison", 20_000);
@@ -233,7 +262,7 @@ await check("restores an earlier version (two clicks), file changes on disk", as
 });
 
 await check("Save PDF (mod+S) exports to the output folder", async () => {
-  await waitFor("document.getElementById('status').textContent.startsWith('compiled')", "compiled", 20_000);
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "built", 20_000);
   await press("s", [MOD]);
   await until(async () => (await Bun.file(path.join(resumes, "main.pdf")).exists()), 10_000, "resumes/main.pdf");
 });

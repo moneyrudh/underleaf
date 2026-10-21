@@ -36,7 +36,7 @@ export async function viewSnapshot(snap: Snapshot) {
   const at = { commit: snap.id, path: snap.path };
 
   if (selected.kind === "doc" && snap.path.endsWith(".tex")) {
-    preview.setStatus("compiling this version…", "busy");
+    preview.setStatus("Building this version…", "busy");
     const res = await fetch(url(API.historyPdf, at)).catch(() => null);
     if (versions.viewing?.id !== snap.id) return; // moved on while it compiled
     if (!res?.ok) {

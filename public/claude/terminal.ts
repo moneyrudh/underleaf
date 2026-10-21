@@ -30,18 +30,21 @@ function chord(e: KeyboardEvent) {
   return [...mods, e.key.toLowerCase()].join("+");
 }
 
+const MONO = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+
 /**
  * The real Claude Code TUI, running in a PTY on the server and drawn here with xterm.js.
  * The connection is lazy so a hidden pane doesn't start a `claude` process.
  */
 export class ClaudeTerminal {
   private term = new Terminal({
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+    fontFamily: MONO,
     fontSize: 13,
     cursorBlink: false,
     cursorInactiveStyle: "outline", // hollow cursor when another pane has focus
     allowProposedApi: true,
-    theme: { background: "#141a16", foreground: "#dfe6e1", cursor: "#4caf6e", selectionBackground: "#2f4a39" },
+    // Matches --term / --term-ink in styles/tokens.css: the pane is dark in both themes.
+    theme: { background: "#121915", foreground: "#dfe7e1", cursor: "#6cc28a", selectionBackground: "#2f4a39" },
   });
   private fit = new FitAddon();
   private ws?: WebSocket;
@@ -63,6 +66,12 @@ export class ClaudeTerminal {
     this.term.textarea?.addEventListener("focus", () => (this.term.options.cursorBlink = true));
     this.term.textarea?.addEventListener("blur", () => (this.term.options.cursorBlink = false));
     new ResizeObserver(() => this.resize()).observe(el);
+    // xterm measures character cells when it opens; measure again once the bundled font is in.
+    document.fonts.load(`13px "JetBrains Mono"`).then(() => {
+      this.term.options.fontFamily = "monospace"; // a real change, so xterm re-measures
+      this.term.options.fontFamily = MONO;
+      this.resize();
+    });
   }
 
   connect() {

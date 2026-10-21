@@ -10,6 +10,7 @@ const logs = $("logs");
 const logsButton = $("toggle-logs");
 const diagnosticsEl = $("diagnostics");
 const statusEl = $("status");
+const compareStatusEl = $("compare-status"); // the same line, shown in the compare bar while it replaces the toolbar
 const body = $("preview-body"); // carries the busy/stale bar along its top edge
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -18,9 +19,14 @@ let zoom: number | "fit" = "fit";
 let renderedScale = 1; // what "fit" resolved to on the last render
 let renderToken = 0;
 
-export function setStatus(text: string, kind: "ok" | "busy" | "fail" | "info" | "" = "") {
-  statusEl.textContent = text;
-  statusEl.className = `status ${kind}`;
+/** The status chip: one short line, with optional details in its tooltip. */
+export function setStatus(text: string, kind: "ok" | "busy" | "fail" | "info" | "" = "", details?: string) {
+  for (const el of [statusEl, compareStatusEl]) {
+    el.textContent = text;
+    el.className = `status ${kind}`;
+    if (details) el.dataset.tip = details;
+    else delete el.dataset.tip;
+  }
   body.classList.toggle("busy", kind === "busy");
 }
 
@@ -151,16 +157,33 @@ export function stepZoom(dir: 1 | -1) {
   const next = dir > 0 ? ZOOM_STEPS.find((z) => z > now + 0.01) : [...ZOOM_STEPS].reverse().find((z) => z < now - 0.01);
   if (next === undefined) return;
   zoom = next;
+  showZoom();
   render();
+}
+
+export function setZoom(scale: number) {
+  zoom = scale;
+  showZoom();
+  render();
+}
+
+/** The zoom menu's button says the current zoom; the menu checks the matching choice. */
+function showZoom() {
+  $("zoom-label").textContent = zoom === "fit" ? "Fit" : `${Math.round(zoom * 100)}%`;
+  $("zoom-fit").setAttribute("aria-checked", String(zoom === "fit"));
+  for (const preset of document.querySelectorAll<HTMLElement>("[data-zoom]")) preset.setAttribute("aria-checked", String(Number(preset.dataset.zoom) === zoom));
 }
 
 $("zoom-in").onclick = () => stepZoom(1);
 $("zoom-out").onclick = () => stepZoom(-1);
+for (const preset of document.querySelectorAll<HTMLElement>("[data-zoom]")) preset.onclick = () => setZoom(Number(preset.dataset.zoom));
 export function fitWidth() {
   zoom = "fit";
+  showZoom();
   render();
 }
 $("zoom-fit").onclick = fitWidth;
+showZoom();
 
 // ---------- keyboard scrolling ----------
 
@@ -218,8 +241,12 @@ export function openLogs() {
 export function showDiagnostics(list: Diagnostic[]) {
   activeDiagnostic = -1;
   const errors = list.filter((d) => d.severity === "error").length;
-  logsButton.querySelector(".label")!.textContent = list.length ? `Logs (${list.length})` : "Logs";
-  logsButton.classList.toggle("has-errors", errors > 0);
+  // A count badge on the Logs icon: red when something stops the build, amber for warnings only.
+  const badge = logsButton.querySelector<HTMLElement>(".badge")!;
+  badge.hidden = list.length === 0;
+  badge.textContent = list.length > 99 ? "99+" : String(list.length);
+  badge.classList.toggle("error", errors > 0);
+  logsButton.setAttribute("aria-label", list.length ? `Logs: ${errors} errors, ${list.length - errors} warnings` : "Logs");
 
   if (list.length === 0) {
     const li = document.createElement("li");
