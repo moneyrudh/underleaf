@@ -11,7 +11,9 @@
     <header class="titlebar">
       <div class="tb-left">
         <span class="brand">under<i>leaf</i></span>
-        <span id="workspace-name" class="workspace-name"></span>
+        <button id="workspace-btn" class="workspace-btn" aria-haspopup="listbox" aria-label="Workspace">
+          <span class="ws-name"></span><span class="ws-path"></span><span class="chev">▾</span>
+        </button>
         <span id="connection" class="connection" hidden>Disconnected. Is <code>bun dev</code> running?</span>
       </div>
       <button id="quick-open" class="search">
@@ -56,7 +58,7 @@
       <section id="claude-pane" class="pane claude-pane">
         <div class="pane-head">
           <span class="pane-title">Claude</span>
-          <span class="hint">in <code>latex/</code></span>
+          <span class="hint">in <code id="claude-where"></code></span>
         </div>
         <div id="terminal" class="terminal"></div>
       </section>
@@ -89,7 +91,17 @@
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
             <span class="badge" hidden></span>
           </button>
-          <button id="export" class="primary" hidden data-key="mod+s">Save PDF</button>
+          <div id="save-group" class="split menu-wrap" hidden>
+            <button id="export" class="primary" data-key="mod+s">Save PDF</button>
+            <button id="save-more" class="primary caret" aria-haspopup="menu" aria-controls="save-menu" aria-label="More ways to save">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 6.5 3.5 3.5 3.5-3.5" /></svg>
+            </button>
+            <div id="save-menu" class="popover" role="menu" hidden>
+              <button role="menuitem" data-command="save-again" data-key="mod+s"><span class="stack"><span>Save again</span><small id="save-again-name"></small></span></button>
+              <button role="menuitem" data-command="save-as" data-key="mod+shift+s">Save As…</button>
+              <button role="menuitem" data-command="save-downloads">Save to Downloads</button>
+            </div>
+          </div>
           <div class="menu-wrap">
             <button id="more-btn" class="ibtn" aria-haspopup="menu" aria-controls="more-menu" data-tip="More" aria-label="More">
               <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="12.5" cy="8" r="1.3" /></svg>

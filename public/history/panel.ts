@@ -159,9 +159,11 @@ export class HistoryPanel {
       what.textContent = "";
       const strong = document.createElement("strong");
       if (snap.kind === "export") {
-        // An export marks what you sent: say so, with an exact date rather than "3d ago".
-        const pdf = snap.label.replace(/^Exported /, "");
-        strong.textContent = "This is the version you exported";
+        // A save marks what you sent: say so, with an exact date rather than "3d ago".
+        // Older history says "Exported resumes/x.pdf"; newer "Saved as x.pdf" or "Downloaded x.pdf".
+        const downloaded = snap.label.startsWith("Downloaded ");
+        const pdf = snap.label.replace(/^(Exported|Saved as|Downloaded) /, "");
+        strong.textContent = downloaded ? "This is the version you downloaded" : "This is the version you saved";
         what.append(strong, ` as ${pdf} · ${absoluteTime(snap.time)}`);
       } else {
         strong.textContent = "Viewing an earlier version";
@@ -174,7 +176,7 @@ export class HistoryPanel {
   private disarm() {
     clearTimeout(this.armTimer);
     this.restoreButton.classList.remove("armed");
-    this.restoreButton.textContent = this.viewing?.kind === "export" ? "Restore the exported version" : "Restore this version";
+    this.restoreButton.textContent = this.viewing?.kind === "export" ? "Restore the saved version" : "Restore this version";
   }
 
   /** Fade an edge of the timeline only when there's more to scroll on that side. */

@@ -1,7 +1,9 @@
 import * as preview from "../preview/preview";
 import { closePalette, openPalette, paletteOpen } from "../ui/palette";
 import { installKeymap, label, LEADER, type Bindings } from "./keys";
-import { copyPath, exportPdf, mention, quickOpen, reopen, toggleAgentFiles, tree } from "../files/open";
+import { copyPath, mention, quickOpen, reopen, toggleAgentFiles, tree } from "../files/open";
+import { hasSaveTarget, saveAs, savePdf, saveToDownloads } from "../files/save";
+import { openFolder, switchWorkspacePalette } from "../files/workspaces";
 import { versions } from "../history/versions";
 import { canCompare, compareVersions, compareWithFile, diffView, toggleCompare } from "../compare/compare";
 import { claude, cyclePane, focused, focusPane, markFocused, setPaneVisible, togglePane, toggleZoomPane } from "./layout";
@@ -46,7 +48,12 @@ export const COMMANDS: Command[] = [
   // ---------- anywhere ----------
   { title: "Go to file…", keys: ["mod+p"], scope: "global", run: () => (paletteOpen() ? closePalette() : quickOpen()) },
   { title: "Command palette", keys: ["mod+shift+p"], scope: "global", run: commandPalette, palette: false },
-  { title: "Save PDF to resumes/", keys: ["mod+s"], scope: "global", run: exportPdf, when: isDoc },
+  { id: "save", title: "Save PDF", keys: ["mod+s"], scope: "global", run: savePdf, when: isDoc },
+  { id: "save-as", title: "Save PDF As…", keys: ["mod+shift+s"], scope: "global", run: saveAs, when: isDoc },
+  { id: "save-again", title: "Save again", run: savePdf, when: () => isDoc() && hasSaveTarget(), palette: false },
+  { id: "save-downloads", title: "Save PDF to Downloads", run: saveToDownloads, when: isDoc },
+  { id: "open-folder", title: "Open folder…", run: openFolder },
+  { id: "switch-workspace", title: "Switch workspace…", run: switchWorkspacePalette, when: () => (state.workspace?.recent.length ?? 0) > 1 },
   { title: "Focus pane to the left", keys: ["h", "arrowleft"], scope: "leader", run: () => cyclePane(-1), palette: false, sheet: "Focus pane left / right" },
   { title: "Focus pane to the right", keys: ["l", "arrowright"], scope: "leader", run: () => cyclePane(1), palette: false, sheet: "Focus pane left / right" },
   { title: "Focus files", keys: ["1"], scope: "leader", run: () => focusPane("tree"), sheet: "Focus files / Claude / preview" },

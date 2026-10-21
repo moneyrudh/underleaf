@@ -45,4 +45,4 @@ For a long job description or a big change, wait for a go-ahead. For a small one
 
 - Summarize the changes in a few lines: what moved up, what was cut, which terms you mirrored, and any gaps that remain.
 - Add a row to `memory/applications.md` (date, company, role, folder, status `drafted`).
-- Remind the user to press **Save PDF** (⌘S) when they're happy. It writes to `resumes/<folder>/resume.pdf`.
+- Remind the user to press **Save PDF** (⌘S) when they're happy, to save the PDF wherever they want to keep it.

@@ -1,4 +1,5 @@
-import { $, STORED, storage } from "./util";
+import { $ } from "./util";
+import type { WorkspaceMessage } from "../../shared/protocol";
 import type { FileNode } from "../../shared/types";
 
 /** What's open and what the server has told us, shared by the modules that make up the app. */
@@ -8,21 +9,24 @@ export const state = {
   historyEnabled: false,
   /** Latest good PDF of the open document. */
   lastPdf: null as string | null,
-  /** Tree root keys ("latex", "resumes") → absolute folders. */
+  /** Tree root keys ("latex") → absolute folders. */
   roots: {} as Record<string, string>,
-  /** Recently opened paths, most recent first (quick-open ranks by this). */
-  recent: JSON.parse(storage(STORED.recent) ?? "[]") as string[],
+  /** The open workspace (folder), and the others opened recently. Set by the server's first message. */
+  workspace: null as WorkspaceMessage | null,
+  /** Recently opened paths in this workspace, most recent first (quick-open ranks by this). Loaded with the workspace. */
+  recent: [] as string[],
 };
 
 /** The preview toolbar's document actions. */
 export const ui = {
   title: $("preview-title"),
   exportButton: $<HTMLButtonElement>("export"),
+  save: $("save-group"), // Save PDF and its menu
   download: $<HTMLAnchorElement>("download"),
   zoom: $("zoom"),
 };
 
 /** Earlier versions and comparisons can't be saved or zoomed: hide those actions meanwhile. */
 export function hideDocumentActions() {
-  ui.exportButton.hidden = ui.download.hidden = ui.zoom.hidden = true;
+  ui.save.hidden = ui.download.hidden = ui.zoom.hidden = true;
 }

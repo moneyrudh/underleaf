@@ -5,7 +5,6 @@ import type { DirNode, FileNode, TreeNode } from "../../shared/types";
 
 export type BriefInput = {
   latex: DirNode;
-  resumes: DirNode;
   results: Map<string, CompileResult | undefined>; // keyed by "latex/…" doc path
   compiling: Set<string>;
   open: string | null;
@@ -16,7 +15,7 @@ export type BriefInput = {
  * each document compiles, page counts, and errors. Claude's CLAUDE.md imports it at
  * session start and re-reads it after edits to see compile results.
  */
-export function renderBrief({ latex, resumes, results, compiling, open }: BriefInput): string {
+export function renderBrief({ latex, results, compiling, open }: BriefInput): string {
   const files = (tree: DirNode) => {
     const out: FileNode[] = [];
     const walk = (n: TreeNode) => (n.type === "dir" ? n.children.forEach(walk) : out.push(n));
@@ -73,11 +72,6 @@ export function renderBrief({ latex, resumes, results, compiling, open }: BriefI
     lines.push("", "## Other files", "");
     for (const f of other) lines.push(`- \`${rel(f.path)}\``);
   }
-
-  const exported = files(resumes);
-  lines.push("", "## Exported PDFs (`../resumes/`)", "");
-  if (exported.length === 0) lines.push("_None yet._");
-  for (const f of exported) lines.push(`- \`${rel(f.path)}\` (saved ${when(f.mtime)})`);
 
   return lines.join("\n") + "\n";
 }

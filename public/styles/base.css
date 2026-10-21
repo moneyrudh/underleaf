@@ -60,6 +60,12 @@ button, .button {
 .primary:hover { background: var(--leaf-strong); }
 .primary:disabled { opacity: 0.45; cursor: default; background: var(--leaf); }
 
+/* Split button: Save PDF ▾ */
+.split { display: inline-flex; }
+.split > .primary:first-child { border-radius: 6px 0 0 6px; }
+.split > .primary.caret { border-radius: 0 6px 6px 0; padding: 0 6px; margin-left: 1px; }
+.split > .primary.caret svg { width: 12px; height: 12px; }
+
 /* Quiet bordered button (banner actions, "Compare the source instead"). */
 .ghost {
   display: inline-flex;

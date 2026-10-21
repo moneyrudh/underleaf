@@ -19,7 +19,7 @@ type Handlers = { onOpen: (file: FileNode) => void };
  * The cursor (where you are) is separate from the open file (what's previewed).
  */
 export class FileTree {
-  private expanded = new Set<string>(JSON.parse(storage(STORED.expanded) ?? '["latex","resumes"]'));
+  private expanded = new Set<string>(); // loaded on the first update, once the workspace is known
   private trees: DirNode[] = [];
   private nodes = new Map<string, TreeNode>();
   private visible: string[] = []; // row paths in display order, for j/k
@@ -33,6 +33,7 @@ export class FileTree {
 
   update(trees: DirNode[]) {
     const firstLoad = this.trees.length === 0;
+    if (firstLoad) this.expanded = new Set(JSON.parse(storage(STORED.expanded) ?? '["latex"]'));
     this.trees = trees;
     this.nodes.clear();
     const index = (node: TreeNode) => {
