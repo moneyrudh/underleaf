@@ -174,7 +174,7 @@ export class DiffView {
       const top = first.getBoundingClientRect().top - this.el.getBoundingClientRect().top + this.el.scrollTop;
       this.el.scrollTo({ top: Math.max(0, top - this.el.clientHeight / 3), behavior: "smooth" });
     }
-    setStatus(`change ${this.at + 1} of ${count}`, "info");
+    setStatus(`Change ${this.at + 1} of ${count}`, "info");
   }
 
   private updateModeButtons() {
@@ -193,7 +193,7 @@ export class DiffView {
     const token = ++this.token;
     const [a, b] = [this.a!, this.b!];
     this.el.classList.add("loading");
-    setStatus("comparing…", "busy");
+    setStatus("Comparing…", "busy");
     if (this.mode === "source") return this.loadSource(token, a, b);
 
     const loaded = await Promise.all([loadPdf(a), loadPdf(b)]);
@@ -215,7 +215,7 @@ export class DiffView {
     const walk = (r: SourceRow) => (r.kind === "fold" ? r.rows.forEach(walk) : r.kind === "add" ? added++ : r.kind === "del" && removed++);
     rows.forEach(walk);
     this.swap(renderSource(rows, a, b));
-    setStatus(changes ? `${plural(changes, "change")} · +${added} −${removed} lines` : "No changes in the source", changes ? "info" : "ok");
+    setStatus(changes ? plural(changes, "change") : "No changes", changes ? "info" : "ok", changes ? `${added} lines added, ${removed} removed` : "The LaTeX source is identical.");
   }
 
   // ---------- reader view ----------
@@ -229,7 +229,7 @@ export class DiffView {
       const el = message(`${escape(which)}: ${escape((la.error ?? lb.error)!)}<br><button class="ghost" data-source>Compare the source instead</button>`);
       el.querySelector<HTMLButtonElement>("[data-source]")!.onclick = () => this.setMode("source");
       this.swap(el);
-      return setStatus("can't compare the PDFs", "fail");
+      return setStatus("Can't compare the PDFs", "fail");
     }
 
     this.renderedWidth = this.el.clientWidth;
@@ -284,8 +284,9 @@ export class DiffView {
     this.swap(grid);
     const n = this.changes.length;
     setStatus(
-      n ? `${plural(n, "change")} · +${added} −${removed} words` : "Same text. Any differences are in layout or styling.",
+      n ? plural(n, "change") : "Same text",
       n ? "info" : "ok",
+      n ? `${added} words added, ${removed} removed` : "The text is identical. Any differences are in layout or styling.",
     );
   }
 

@@ -25,7 +25,7 @@ export class HistoryPanel {
   private banner = $("snapshot-banner");
   private restoreButton = $<HTMLButtonElement>("snapshot-restore");
   private strip = $("version-strip");
-  private showStrip = $("show-strip"); // brings a hidden version bar back
+  private stripToggle = $("hide-strip").querySelector(".label")!; // "Hide/Show version bar" in the ⋯ menu
   private track = $("version-track");
   private tip = $("version-tip");
   private stripOn = storage(STORED.versionStrip) !== "0";
@@ -37,8 +37,6 @@ export class HistoryPanel {
 
   constructor(private handlers: Handlers) {
     this.button.onclick = () => this.toggle();
-    $("hide-strip").onclick = () => this.toggleStrip();
-    this.showStrip.onclick = () => this.toggleStrip();
 
     // A plain mouse wheel scrolls vertically; let it move the timeline sideways too.
     const scroller = this.track.parentElement!;
@@ -108,6 +106,7 @@ export class HistoryPanel {
 
   /** Show or hide the version strip (remembered). */
   toggleStrip() {
+    if (!this.available) return; // no version bar for this file: don't silently change the saved setting
     this.stripOn = !this.stripOn;
     storage(STORED.versionStrip, this.stripOn ? "1" : "0");
     this.refresh();
@@ -238,7 +237,7 @@ export class HistoryPanel {
 
   private renderStrip() {
     this.strip.hidden = !(this.available && this.stripOn);
-    this.showStrip.hidden = !(this.available && !this.stripOn);
+    this.stripToggle.textContent = this.stripOn ? "Hide version bar" : "Show version bar";
     if (this.strip.hidden) return;
 
     const make = (cls: string, glyph: string, active: boolean, tipText: () => [string, string], onClick: () => void) => {
@@ -247,6 +246,7 @@ export class HistoryPanel {
       dot.className = `vdot ${cls}`;
       dot.classList.toggle("active", active);
       dot.textContent = glyph;
+      dot.setAttribute("aria-label", tipText().join(", "));
       dot.onclick = onClick;
       const show = () => this.showTip(dot, ...tipText());
       const hide = () => (this.tip.hidden = true);

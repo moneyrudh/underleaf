@@ -60,6 +60,11 @@ export class FileTree {
     return [...this.nodes.values()].filter((n): n is FileNode => n.type === "file" && this.listed(n.path));
   }
 
+  /** How many agent files exist (CLAUDE.md and everything in memory/), shown or not. */
+  get agentFileCount() {
+    return [...this.nodes.values()].filter((n) => n.type === "file" && isAgentPath(n.path)).length;
+  }
+
   get agentFilesVisible() {
     return this.showAgent;
   }
@@ -173,7 +178,7 @@ export class FileTree {
     const open = this.expanded.has(dir.path);
     const wrap = document.createElement("div");
     wrap.setAttribute("role", "group");
-    const row = this.row(dir.path, depth, root ? `${dir.path}/` : dir.name, root ? "" : ICONS.folder, open ? "▾" : "▸");
+    const row = this.row(dir.path, depth, dir.name, root ? "" : ICONS.folder, open ? "▾" : "▸"); // a root reads as a group label
     if (root) row.classList.add("root");
     row.setAttribute("aria-expanded", String(open));
     row.onclick = () => {

@@ -1,0 +1,6 @@
+/* Claude Code's terminal. Dark in both themes. */
+
+.terminal { flex: 1; min-height: 0; background: var(--term); }
+/* Padding on .xterm itself so the fit addon accounts for it. */
+.terminal .xterm { height: 100%; padding: 4px 0 0 12px; }
+.terminal .xterm-viewport { background: var(--term) !important; }

@@ -1,0 +1,119 @@
+/* The preview: toolbar, status, the desk the pages sit on, Logs. */
+
+.toolbar { border-bottom: 1px solid var(--line); overflow: visible; } /* its menus hang below it */
+.toolbar .pane-title.file { font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); max-width: 36ch; min-width: 6ch; }
+/* A narrow preview drops what matters least first: the status chip (its line is in the tooltip and
+   the pane's aria), then the shortcut chip on Save PDF. The file name never shrinks to nothing. */
+@container preview (max-width: 560px) { .toolbar .status { display: none; } }
+@container preview (max-width: 440px) { .toolbar .primary kbd.k { display: none; } }
+.preview-pane:not([data-focused]) .toolbar .pane-title.file { color: var(--muted); }
+
+/* One status chip: a colored dot and one short line. Details are in its tooltip. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 34ch;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.status:empty { display: none; }
+.status::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.status.ok::before { background: var(--leaf); }
+.status.busy::before { background: var(--warn); }
+.status.fail::before { background: var(--error); }
+.status.fail { color: var(--error); border-color: color-mix(in srgb, var(--error) 35%, var(--line)); }
+.status.info::before { display: none; }
+
+.preview-body { flex: 1; display: flex; min-height: 0; position: relative; }
+/* Thin bar along the top: sweeping while compiling, solid red while the build is broken. */
+.preview-body::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+}
+.preview-body.stale::before { opacity: 1; background: var(--error); }
+.preview-body.busy::before {
+  opacity: 1;
+  background: linear-gradient(90deg, transparent, var(--leaf), transparent) 0 0 / 40% 100% no-repeat;
+  animation: sweep 0.9s ease-in-out infinite;
+}
+@keyframes sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+@media (prefers-reduced-motion: reduce) { .preview-body.busy::before { animation: none; background: var(--leaf); opacity: 0.6; } }
+
+.viewer-col { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+/* Paper on a desk: a warm neutral with a faint grain behind the pages. */
+.viewer, .diff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+  background-color: var(--desk);
+  background-image: radial-gradient(var(--grain) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+.pages { display: flex; flex-direction: column; align-items: center; gap: 18px; width: max-content; min-width: 100%; }
+.page { display: block; background: white; box-shadow: var(--shadow-page); }
+.viewer > * { transition: opacity 150ms ease-out; }
+.viewer.loading > * { opacity: 0.45; } /* switching files/versions: dim until the next view is ready */
+.viewer .pages { transition: opacity 180ms ease-out; }
+.viewer.stale .pages { opacity: 0.55; }
+.viewer img.image { display: block; margin: 0 auto; max-width: 100%; background: white; box-shadow: var(--shadow-page); }
+.viewer pre.source {
+  margin: 0 auto;
+  max-width: 100ch;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 12.5px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.message { margin: 16vh auto; max-width: 440px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.message strong { color: var(--ink); font-weight: 600; }
+
+/* Side panels: Logs and Version history. */
+.side-panel {
+  width: min(340px, 42%);
+  overflow: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+}
+.side-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 11px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.logs ul { list-style: none; margin: 0; padding: 0; }
+.logs li { padding: 10px 14px; border-bottom: 1px solid var(--line); border-left: 2px solid transparent; }
+.logs li.active { border-left-color: var(--leaf); background: var(--leaf-soft); }
+.logs .where { display: block; margin-bottom: 3px; font: 11.5px var(--mono); }
+.logs .error .where { color: var(--error); }
+.logs .warning .where { color: var(--warn); }
+.logs .msg { font: 12px/1.5 var(--mono); word-break: break-word; }
+.logs .none { color: var(--muted); font-size: 13px; }

@@ -65,6 +65,7 @@ export function setPaneVisible(name: PaneName, visible: boolean) {
   pane.hidden = splitter.hidden = !visible;
   if (name === "tree") $("tree-rail").hidden = visible; // collapsed files leave a slim rail to reopen them
   TOGGLES[name]?.classList.toggle("on", visible);
+  TOGGLES[name]?.setAttribute("aria-pressed", String(visible));
   storage(SHOWN_KEY[name], visible ? "1" : "0");
   if (visible && name === "claude") claude.focus();
   if (!visible && focusedPane === name) focusPane("preview");

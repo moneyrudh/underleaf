@@ -3,7 +3,8 @@ import { installHints } from "./ui/hints";
 import { initLayout, focusPane } from "./core/layout";
 import { initOpening } from "./files/open";
 import { initCheatsheet } from "./ui/cheatsheet";
-import { installCommands } from "./core/commands";
+import { commandAvailable, installCommands, runCommand } from "./core/commands";
+import { installPopovers } from "./ui/popover";
 import { connect } from "./core/connection";
 import { STORED, storage } from "./core/util";
 
@@ -24,6 +25,7 @@ initLayout();
 initOpening();
 initCheatsheet();
 installCommands();
+installPopovers({ run: runCommand, available: commandAvailable });
 for (const kbd of document.querySelectorAll<HTMLElement>("kbd[data-key]")) kbd.textContent = label(kbd.dataset.key!);
 installHints();
 connect();

@@ -113,16 +113,30 @@ export function openMenu(anchor: HTMLElement, items: MenuItem[], selected: strin
     if (!menu.contains(e.target as Node) && !anchor.contains(e.target as Node)) close?.();
   };
   const dismiss = () => close?.();
-  close = () => {
+  // A shortcut (⌘P, ⌘S, the leader…) means you've moved on: close without taking focus back.
+  const onShortcut = (e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) shut(false);
+  };
+  const shut = (refocus: boolean) => {
     close = null;
     menu.remove();
     anchor.setAttribute("aria-expanded", "false");
     document.removeEventListener("pointerdown", outside, true);
+    window.removeEventListener("keydown", onShortcut, true);
     window.removeEventListener("resize", dismiss);
     window.removeEventListener("blur", dismiss);
-    anchor.focus({ preventScroll: true });
+    if (refocus) anchor.focus({ preventScroll: true });
   };
+  close = () => shut(true);
+  // Focus leaving the menu (the palette opening, a click elsewhere) closes it too.
+  menu.addEventListener("focusout", (e) => {
+    if (close && !menu.contains(e.relatedTarget as Node | null)) shut(false);
+  });
+  menu.addEventListener("mousedown", (e) => {
+    if (e.target !== input) e.preventDefault(); // clicking a row keeps focus in the filter
+  });
   document.addEventListener("pointerdown", outside, true);
+  window.addEventListener("keydown", onShortcut, true);
   window.addEventListener("resize", dismiss);
   window.addEventListener("blur", dismiss);
   anchor.setAttribute("aria-expanded", "true");

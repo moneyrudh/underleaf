@@ -47,7 +47,7 @@ function handle(msg: ServerMessage) {
   }
 
   // While an earlier version is on screen, keep tracking the live build but don't replace the view.
-  if (msg.type === "compiling") return versions.viewing ? undefined : preview.setStatus("compiling…", "busy");
+  if (msg.type === "compiling") return versions.viewing ? undefined : preview.setStatus("Building…", "busy");
   if (versions.viewing) {
     state.lastPdf = msg.pdf;
     return;
@@ -55,9 +55,14 @@ function handle(msg: ServerMessage) {
 
   const errors = msg.diagnostics.filter((d) => d.severity === "error").length;
   if (msg.ok) {
-    preview.setStatus(`compiled in ${msg.ms}ms · ${msg.pages} page${msg.pages === 1 ? "" : "s"} · ${msg.engine}`, "ok");
+    const seconds = msg.ms < 10_000 ? (msg.ms / 1000).toFixed(1) : Math.round(msg.ms / 1000);
+    preview.setStatus(`Built in ${seconds} s · ${msg.pages} page${msg.pages === 1 ? "" : "s"}`, "ok", `Compiled with ${msg.engine} in ${msg.ms} ms`);
   } else {
-    preview.setStatus(`${errors || 1} error${errors > 1 ? "s" : ""}${msg.pdf ? " — showing last good PDF" : ""}`, "fail");
+    preview.setStatus(
+      `${errors || 1} error${errors > 1 ? "s" : ""}`,
+      "fail",
+      msg.pdf ? "The build failed. Showing the last PDF that built; the errors are in Logs (L)." : "The build failed. The errors are in Logs (L).",
+    );
     preview.openLogs(); // surface errors the moment they happen
   }
   preview.showDiagnostics(msg.diagnostics);

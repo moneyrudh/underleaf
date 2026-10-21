@@ -1,0 +1,124 @@
+/* Comparing versions or files. The compare bar takes over from the preview toolbar. */
+
+.preview-pane:has(.viewer-col.comparing) > .toolbar { display: none; }
+/* One row when there's room; at narrower widths the pickers get the first row and the controls wrap
+   to a second, instead of everything squeezing until it's unreadable or clipped. */
+.compare-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--bar-h);
+  padding: 7px 8px 7px 10px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.preview-pane[data-focused] > .compare-bar::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--leaf); }
+.viewer-col.comparing .snapshot-banner { display: none; } /* the compare bar says what's on screen */
+.compare-sides { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 300px; }
+.compare-bar .status { flex: none; max-width: none; }
+.compare-bar .spacer { flex: 1 0 0; }
+.compare-sides .arrow { color: var(--muted); flex: none; }
+.compare-names { overflow: hidden; text-overflow: ellipsis; white-space: pre; font-weight: 500; }
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: 280px;
+  min-width: 110px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  text-align: left;
+  font-weight: 500;
+  font-size: 12.5px;
+}
+.picker:hover, .picker[aria-expanded="true"] { border-color: var(--line-strong); }
+.picker .icon { flex: none; width: 14px; text-align: center; color: var(--faint); }
+.picker-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker .chevron { flex: none; color: var(--muted); font-size: 10px; }
+.kind-claude.icon, .menu .kind-claude .icon { color: var(--kind-claude); }
+.kind-export.icon, .menu .kind-export .icon { color: var(--leaf); }
+.kind-restore.icon, .menu .kind-restore .icon { color: var(--kind-restore); }
+.kind-current.icon, .menu .kind-current .icon { color: var(--leaf); font-size: 9px; }
+
+.seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { height: 24px; padding: 0 9px; font-size: 12px; color: var(--muted); }
+.seg button.on { background: var(--leaf-soft); color: var(--ink); font-weight: 500; }
+.seg button:disabled { opacity: 0.4; cursor: default; }
+.seg button.on kbd.k { display: none; } /* S switches to the other view, so only the other button shows it */
+
+.diff > * { transition: opacity 150ms ease-out; }
+.diff.loading > * { opacity: 0.45; }
+.diff .message .ghost { margin-top: 12px; }
+
+/* Reader: both PDFs side by side in one scroller, so they move together. */
+.diff-reader { display: grid; grid-template-columns: repeat(2, max-content); gap: 16px var(--gap); justify-content: center; }
+.diff-head {
+  position: sticky;
+  top: -24px;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 2px;
+  background: var(--desk);
+  font-size: 12px;
+  color: var(--muted);
+}
+.diff-head .tag { flex: none; font-weight: 600; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.diff-head.before .tag { color: var(--error); }
+.diff-head.after .tag { color: var(--leaf); }
+.diff-head .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-reader .diff-head { max-width: 100%; width: 0; min-width: 100%; }
+.diff-page { position: relative; }
+.diff-page canvas { box-shadow: var(--shadow-page); }
+.diff-page.missing { border: 1px dashed var(--line-strong); border-radius: 4px; }
+.hl { position: absolute; border-radius: 2px; pointer-events: none; mix-blend-mode: multiply; }
+.hl.del { background: var(--del); }
+.hl.add { background: var(--add); }
+.hl.caret { width: 2px !important; margin-left: -1px; }
+.hl.caret.del { background: var(--error); }
+.hl.caret.add { background: var(--leaf); }
+/* The change ]c / [c landed on: a stronger fill rather than outlines, which get noisy on long changes. */
+.hl.del.current { background: var(--del-strong); }
+.hl.add.current { background: var(--add-strong); }
+.hl.caret.current { box-shadow: 0 0 0 2px var(--focus-change); }
+
+/* Source: line diff with the changed words marked. */
+.diff-source { max-width: 120ch; margin: 0 auto; font: 12.5px/1.6 var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.diff-source-head { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: -24px; z-index: 1; }
+.diff-source-head .diff-head { background: transparent; }
+.src-row { display: grid; grid-template-columns: 3.2em 3.2em 1.4em 1fr; }
+.src-row .ln { text-align: right; padding-right: 8px; color: var(--faint); user-select: none; }
+.src-row .sign { text-align: center; user-select: none; color: var(--faint); }
+.src-row .code { white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 16px; min-width: 0; } /* LaTeX paragraphs are long lines: wrap them */
+.src-row.del { background: color-mix(in srgb, var(--del) 40%, transparent); }
+.src-row.add { background: color-mix(in srgb, var(--add) 40%, transparent); }
+.src-row.del .sign { color: var(--error); }
+.src-row.add .sign { color: var(--leaf); }
+.src-row.del mark { background: var(--del); color: inherit; border-radius: 2px; }
+.src-row.add mark { background: var(--add); color: inherit; border-radius: 2px; }
+.src-row.current { box-shadow: inset 3px 0 0 var(--focus-change); }
+.src-fold {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-block: 1px solid var(--line);
+  padding: 3px 12px 3px 6.6em;
+  background: var(--sunken);
+  color: var(--muted);
+}
+.src-fold:hover { color: var(--ink); }
+
+@media (prefers-color-scheme: dark) { .hl { mix-blend-mode: normal; } }
+
+/* Very narrow: drop the shortcut chips so the controls fit one row under the pickers. */
+@container preview (max-width: 440px) { .compare-bar kbd.k { display: none; } }

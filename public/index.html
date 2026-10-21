@@ -8,64 +8,128 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <header class="bar">
-      <span class="brand">under<b>leaf</b></span>
-      <span id="connection" class="connection" hidden>disconnected — is <code>bun dev</code> running?</span>
-      <span class="spacer"></span>
-      <button id="quick-open" class="search" title="Go to file">
-        <span>Go to file…</span><kbd data-key="mod+p"></kbd>
+    <header class="titlebar">
+      <div class="tb-left">
+        <span class="brand">under<i>leaf</i></span>
+        <span id="workspace-name" class="workspace-name"></span>
+        <span id="connection" class="connection" hidden>Disconnected. Is <code>bun dev</code> running?</span>
+      </div>
+      <button id="quick-open" class="search">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>
+        <span>Go to file or command</span><kbd data-key="mod+p"></kbd>
       </button>
-      <span class="spacer"></span>
-      <button id="toggle-tree" class="toggle on" data-tip="Show or hide files · focus them with" data-key="LEADER 1">Files</button>
-      <button id="toggle-claude" class="toggle on" data-tip="Show or hide Claude · focus it with" data-key="LEADER 2">Claude</button>
-      <button id="help" class="toggle icon" aria-label="Keyboard shortcuts" data-tip="Keyboard shortcuts" data-key="?">?</button>
+      <div class="tb-right">
+        <button id="toggle-tree" class="ibtn on" aria-pressed="true" data-tip="Show or hide files · focus them with" data-key="LEADER 1" aria-label="Show or hide files">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M6 2.5v11" /></svg>
+        </button>
+        <button id="toggle-claude" class="ibtn on" aria-pressed="true" data-tip="Show or hide Claude · focus it with" data-key="LEADER 2" aria-label="Show or hide Claude">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M5 6.5 7 8 5 9.5M8.5 10h3" /></svg>
+        </button>
+        <button id="help" class="ibtn" data-tip="Keyboard shortcuts" data-key="?" aria-label="Keyboard shortcuts">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6" /><path d="M6.4 6.3a1.7 1.7 0 1 1 2.4 1.6c-.5.3-.8.6-.8 1.2M8 11.2v.1" /></svg>
+        </button>
+      </div>
     </header>
 
     <main id="workspace" class="workspace">
       <div id="tree-rail" class="tree-rail" hidden>
-        <button id="expand-tree" class="rail-button" aria-label="Show files" data-tip="Show files" data-key="LEADER 1"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
+        <button id="expand-tree" class="ibtn" data-tip="Show files" data-key="LEADER 1" aria-label="Show files">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
+        </button>
       </div>
       <nav id="tree-pane" class="pane tree-pane" tabindex="0" aria-label="Files">
         <div class="pane-head">
           <span class="pane-title">Files</span>
           <span class="spacer"></span>
-          <button id="collapse-tree" class="rail-button" aria-label="Hide files" data-tip="Hide files"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+          <button id="collapse-tree" class="ibtn" data-tip="Hide files" aria-label="Hide files">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+          </button>
         </div>
         <div id="tree" class="tree" role="tree"></div>
+        <div id="tree-foot" class="tree-foot" hidden>
+          <span id="agent-count"></span>
+          <button id="agent-toggle" class="link"></button>
+        </div>
       </nav>
       <div class="splitter" data-pane="tree-pane" data-var="--tree-w"></div>
 
       <section id="claude-pane" class="pane claude-pane">
         <div class="pane-head">
-          <span class="pane-title">Claude Code</span>
-          <span class="hint">working in <code>latex/</code></span>
+          <span class="pane-title">Claude</span>
+          <span class="hint">in <code>latex/</code></span>
         </div>
         <div id="terminal" class="terminal"></div>
       </section>
       <div class="splitter" data-pane="claude-pane" data-var="--claude-w"></div>
 
       <section id="preview-pane" class="pane preview-pane" tabindex="0">
-        <div class="pane-head">
-          <span id="preview-title" class="pane-title">Preview</span>
-          <span id="status" class="status"></span>
+        <div class="pane-head toolbar">
+          <span id="preview-title" class="pane-title file">Preview</span>
+          <span id="status" class="status" role="status"></span>
           <span class="spacer"></span>
-          <div id="zoom" class="zoom" role="group" aria-label="Zoom">
-            <button id="zoom-out" data-tip="Zoom out" data-key="-">−</button>
-            <button id="zoom-fit" data-tip="Fit to width" data-key="=">Fit</button>
-            <button id="zoom-in" data-tip="Zoom in" data-key="+">+</button>
+          <div id="zoom" class="menu-wrap">
+            <button id="zoom-menu-btn" class="select" aria-haspopup="menu" aria-controls="zoom-menu" data-tip="Zoom">
+              <span id="zoom-label">Fit</span><span class="chev">▾</span>
+            </button>
+            <div id="zoom-menu" class="popover" role="menu" hidden>
+              <button id="zoom-fit" role="menuitemradio" data-key="=">Fit width</button>
+              <hr />
+              <button role="menuitemradio" data-zoom="0.75">75%</button>
+              <button role="menuitemradio" data-zoom="1">100%</button>
+              <button role="menuitemradio" data-zoom="1.5">150%</button>
+              <hr />
+              <button id="zoom-in" role="menuitem" data-key="+">Zoom in</button>
+              <button id="zoom-out" role="menuitem" data-key="-">Zoom out</button>
+            </div>
           </div>
-          <button id="show-strip" class="ghost" hidden data-key="V">Versions</button>
-          <button id="toggle-history" class="ghost" hidden data-key="H">History</button>
-          <button id="toggle-logs" class="ghost" hidden data-key="L"><span class="label">Logs</span></button>
+          <button id="toggle-history" class="ibtn" hidden data-tip="Version history" data-key="H" aria-label="Version history">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></svg>
+          </button>
+          <button id="toggle-logs" class="ibtn" hidden data-tip="Logs" data-key="L" aria-label="Logs">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
+            <span class="badge" hidden></span>
+          </button>
           <button id="export" class="primary" hidden data-key="mod+s">Save PDF</button>
-          <a id="download" class="ghost icon" hidden data-tip="Download PDF" aria-label="Download PDF">⤓</a>
+          <div class="menu-wrap">
+            <button id="more-btn" class="ibtn" aria-haspopup="menu" aria-controls="more-menu" data-tip="More" aria-label="More">
+              <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="12.5" cy="8" r="1.3" /></svg>
+            </button>
+            <div id="more-menu" class="popover" role="menu" hidden>
+              <button role="menuitem" data-command="compare-previous" data-key="C">Compare with previous version</button>
+              <button role="menuitem" data-command="compare-file">Compare with another file…</button>
+              <hr />
+              <a id="download" role="menuitem" hidden>Download</a>
+              <button role="menuitem" data-command="copy-path">Copy path</button>
+              <button role="menuitem" data-command="mention" data-key="a">Mention in Claude</button>
+              <hr />
+              <button id="hide-strip" role="menuitem" data-command="version-bar" data-key="V"><span class="label">Hide version bar</span></button>
+            </div>
+          </div>
+        </div>
+        <div id="compare-bar" class="compare-bar" hidden>
+          <div class="compare-sides">
+            <button id="compare-a" class="picker" aria-haspopup="listbox" aria-label="Before"></button>
+            <span class="arrow">→</span>
+            <button id="compare-b" class="picker" aria-haspopup="listbox" aria-label="After"></button>
+            <span id="compare-names" class="compare-names" hidden></span>
+          </div>
+          <span id="compare-status" class="status" role="status"></span>
+          <span class="spacer"></span>
+          <div class="seg" role="group" aria-label="Compare">
+            <button id="compare-reader" data-key="S">Reader</button>
+            <button id="compare-source" data-key="S">Source</button>
+          </div>
+          <button id="compare-prev" class="ibtn" data-tip="Previous change" data-key="[ c" aria-label="Previous change">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 13V3M4 7l4-4 4 4" /></svg>
+          </button>
+          <button id="compare-next" class="ibtn" data-tip="Next change" data-key="] c" aria-label="Next change">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M4 9l4 4 4-4" /></svg>
+          </button>
+          <button id="compare-close" class="primary" data-key="escape">Done</button>
         </div>
         <div id="version-strip" class="version-strip" hidden>
           <span class="strip-title">Versions</span>
           <div class="strip-scroll"><ol id="version-track" class="version-track"></ol></div>
-          <button id="hide-strip" class="rail-button" aria-label="Hide version bar" data-tip="Hide version bar" data-key="V">
-            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-          </button>
           <div id="version-tip" class="version-tip" hidden></div>
         </div>
         <div id="preview-body" class="preview-body">
@@ -77,28 +141,12 @@
               <button id="snapshot-restore" class="ghost">Restore this version</button>
               <button id="snapshot-back" class="primary" data-key="escape">Back to current</button>
             </div>
-            <div id="compare-bar" class="compare-bar" hidden>
-              <div class="compare-sides">
-                <button id="compare-a" class="picker" aria-haspopup="listbox" aria-label="Before"></button>
-                <span class="arrow">→</span>
-                <button id="compare-b" class="picker" aria-haspopup="listbox" aria-label="After"></button>
-                <span id="compare-names" class="compare-names" hidden></span>
-              </div>
-              <span class="spacer"></span>
-              <div class="seg" role="group" aria-label="Compare">
-                <button id="compare-reader" data-key="S">Reader</button>
-                <button id="compare-source" data-key="S">Source</button>
-              </div>
-              <button id="compare-prev" class="ghost icon" aria-label="Previous change" data-tip="Previous change" data-key="[ c">↑</button>
-              <button id="compare-next" class="ghost icon" aria-label="Next change" data-tip="Next change" data-key="] c">↓</button>
-              <button id="compare-close" class="primary" data-key="escape">Done</button>
-            </div>
             <div id="viewer" class="viewer"></div>
             <div id="diff" class="diff" hidden></div>
           </div>
-          <aside id="logs" class="logs" hidden><ul id="diagnostics"></ul></aside>
-          <aside id="history" class="history" hidden>
-            <div class="history-head">Version history</div>
+          <aside id="logs" class="side-panel logs" hidden><div class="side-head">Logs</div><ul id="diagnostics"></ul></aside>
+          <aside id="history" class="side-panel history" hidden>
+            <div class="side-head">Version history</div>
             <ul id="history-list"></ul>
           </aside>
         </div>
