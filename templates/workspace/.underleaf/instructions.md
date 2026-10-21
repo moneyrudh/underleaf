@@ -10,8 +10,7 @@ If a parent folder's CLAUDE.md describes underleaf's source code, that's backgro
 
 | Path | What it is |
 |---|---|
-| `./` (this folder, `latex/`) | The user's LaTeX sources. Everything here shows up in the file tree. |
-| `../resumes/` | PDFs the user exported with **Save PDF**. Read-only for you. |
+| `./` (this folder) | The user's LaTeX sources. Everything here shows up in the file tree. |
 | `memory/` | Your long-term memory about the user. See "Memory" below. |
 | `.underleaf/workspace.md` | Live snapshot written by underleaf: documents, compile status, page counts, errors, what the user has open. |
 | `.claude/skills/` | Your workflows: `tailor-resume`, `fit-one-page`, `update-memory`. |
@@ -21,7 +20,7 @@ If a parent folder's CLAUDE.md describes underleaf's source code, that's backgro
 - Saving any `.tex` file recompiles it automatically (pdflatex, or xelatex when `fontspec` is used). **Don't run LaTeX yourself**, and don't create build files here.
 - About 1–2 seconds after you save, re-read `.underleaf/workspace.md` to see the result: compiled or failed, page count, the first errors with line numbers, and overfull-box warnings (text running into the margin).
 - Only files containing `\documentclass` compile. Fragments pulled in with `\input` are fine; saving them rebuilds the documents that are open.
-- The user exports PDFs themselves with **Save PDF** (⌘S), which mirrors the path into `../resumes/`. Remind them when a version is ready.
+- The user saves PDFs themselves with **Save PDF** (⌘S), to a place they choose. You can't see where. Remind them when a version is ready to send.
 
 ## Ground rules for resumes
 

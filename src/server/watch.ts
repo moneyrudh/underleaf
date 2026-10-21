@@ -1,4 +1,3 @@
-import { LATEX, RESUMES } from "./config";
 import { appClients } from "./clients";
 import { build, latexChanged } from "../build/builds";
 import { scheduleEditSnapshot } from "../history/snapshots";
@@ -10,12 +9,24 @@ import { keepWatching } from "../workspace/files";
 let pending: Timer | undefined;
 const changed = new Set<string>();
 
-export async function startWatching() {
-  await keepWatching(LATEX, (f) => onFsChange(f ? `latex/${f}` : "latex"));
-  await keepWatching(RESUMES, (f) => onFsChange(f ? `resumes/${f}` : "resumes"));
+let watcher: { stop: () => void } | null = null;
+
+/** `recreate`: bring the folder back if it's deleted (only for the checkout's own latex/, never a folder you opened). */
+export async function startWatching(dir: string, recreate: boolean) {
+  stopWatching();
+  const w = keepWatching(dir, (f) => onFsChange(f ? `latex/${f}` : "latex"), recreate);
+  watcher = w;
+  await w.ready;
 }
 
-/** `treePath` is "latex/…" or "resumes/…" (or just the root key when a root was recreated). */
+export function stopWatching() {
+  watcher?.stop();
+  watcher = null;
+  clearTimeout(pending);
+  changed.clear();
+}
+
+/** `treePath` is "latex/…" (or just "latex" when the folder itself was recreated). */
 function onFsChange(treePath: string) {
   // Hidden paths (.underleaf/, .claude/, .git/) never affect the tree or a build.
   if (/(^|\/)(\.[^/]+|node_modules)(\/|$)/.test(treePath)) return;
@@ -30,7 +41,7 @@ function onFsChange(treePath: string) {
     const paths = [...changed];
     changed.clear();
     await rescan();
-    const payload = treeMessage();
+    const payload = JSON.stringify(treeMessage());
     for (const ws of appClients) ws.send(payload);
     // Rebuild what's open (an \input'd fragment may have changed) plus any document
     // that changed itself, so Claude's snapshot reflects edits to files nobody has open.

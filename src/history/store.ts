@@ -1,7 +1,7 @@
-import os from "node:os";
 import path from "node:path";
-import { mkdir } from "node:fs/promises";
+import { cp, mkdir, rm, stat } from "node:fs/promises";
 import type { Snapshot, SnapshotAuthor, SnapshotKind } from "../../shared/types";
+import { HOME } from "../home";
 
 /**
  * Version history for a workspace, stored outside it in ~/.underleaf/history/<id>.git.
@@ -21,7 +21,6 @@ type SnapshotRequest = {
   about?: string;
 };
 
-const HOME = process.env.UNDERLEAF_HOME ?? path.join(os.homedir(), ".underleaf");
 const SEP_RECORD = "\x1e";
 const SEP_FIELD = "\x1f";
 const EMAILS: Record<SnapshotAuthor, string> = { You: "you@underleaf", Claude: "claude@underleaf", underleaf: "app@underleaf" };
@@ -77,6 +76,14 @@ export class HistoryStore {
       ]);
       const id = (await this.git(["rev-parse", "HEAD"])).trim();
       return { id, time: Date.now(), author: req.author, kind: req.kind, label, path: req.about };
+    });
+  }
+
+  /** Whether the workspace is exactly as it was at `commit` (every file, not just one). */
+  unchangedSince(commit: string): Promise<boolean> {
+    return this.serial(async () => {
+      await this.git(["add", "--all"]);
+      return this.git(["diff", "--cached", "--quiet", commit]).then(() => true, () => false); // exit 1 = differences
     });
   }
 
@@ -175,11 +182,27 @@ function parseRecord(record: string): Snapshot {
 }
 
 /** Stable id stored in the workspace, so history survives moving or renaming the folder. */
-async function workspaceId(workDir: string): Promise<string> {
+export async function workspaceId(workDir: string): Promise<string> {
   const file = Bun.file(path.join(workDir, ".underleaf", "id"));
   const existing = (await file.text().catch(() => "")).trim();
   if (/^[\w-]{8,}$/.test(existing)) return existing;
   const id = crypto.randomUUID();
+  await Bun.write(path.join(workDir, ".underleaf", "id"), id + "\n");
+  return id;
+}
+
+/**
+ * Give a copied workspace (same id as the folder it was copied from) an id of its own. Its history
+ * starts as a copy of the original's, so past versions stay, and from here the two are separate.
+ */
+export async function forkWorkspaceId(workDir: string, fromId: string): Promise<string> {
+  const id = crypto.randomUUID();
+  const from = path.join(HOME, "history", `${fromId}.git`);
+  const to = path.join(HOME, "history", `${id}.git`);
+  if ((await stat(from).catch(() => null))?.isDirectory()) {
+    await cp(from, to, { recursive: true });
+    await rm(path.join(to, "index.lock"), { force: true }); // in case the original was mid-snapshot
+  }
   await Bun.write(path.join(workDir, ".underleaf", "id"), id + "\n");
   return id;
 }

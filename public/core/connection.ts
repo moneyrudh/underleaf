@@ -3,7 +3,8 @@ import { onTree } from "../files/open";
 import { versions } from "../history/versions";
 import { diffView } from "../compare/compare";
 import { state, ui } from "./state";
-import { $, escapeHtml } from "./util";
+import { $, escapeHtml, setStorageScope, STORED, storage } from "./util";
+import { showWorkspace } from "../files/workspaces";
 import { SOCKETS, type ClientMessage, type ServerMessage } from "../../shared/protocol";
 
 let ws: WebSocket;
@@ -26,6 +27,17 @@ export function send(msg: ClientMessage) {
 }
 
 function handle(msg: ServerMessage) {
+  if (msg.type === "workspace") {
+    // Another folder was opened (here or in another tab): start fresh in it.
+    if (state.workspace && state.workspace.id !== msg.id) return location.reload();
+    if (!state.workspace) {
+      setStorageScope(msg.id);
+      state.recent = JSON.parse(storage(STORED.recent) ?? "[]");
+    }
+    state.workspace = msg;
+    showWorkspace();
+    return;
+  }
   if (msg.type === "tree") {
     state.roots = msg.roots;
     state.historyEnabled = msg.history;
@@ -36,6 +48,7 @@ function handle(msg: ServerMessage) {
   if (msg.type === "history") return void versions.refresh();
   const selected = state.selected;
   if (!selected || msg.doc !== selected.path) return;
+  state.build = msg.type === "compiling" ? "running" : msg.ok ? "ok" : "failed";
 
   // Comparing: a live side follows the build, and nothing else on screen changes.
   if (diffView.active) {
@@ -69,9 +82,7 @@ function handle(msg: ServerMessage) {
 
   state.lastPdf = msg.pdf;
   ui.exportButton.disabled = !msg.pdf;
-  ui.download.hidden = !msg.pdf;
   if (msg.pdf) {
-    ui.download.href = `${msg.pdf}&download`;
     preview.showPdf(msg.pdf, { stale: !msg.ok });
   } else {
     preview.showMessage(`<strong>${escapeHtml(selected.name)}</strong> hasn't compiled yet — check the logs.`);

@@ -1,6 +1,5 @@
 import type { ServerWebSocket } from "bun";
 import { ClaudeSession } from "../claude/session";
-import { LATEX } from "./config";
 import { endTurn } from "../history/snapshots";
 import type { ServerMessage } from "../../shared/protocol";
 
@@ -11,7 +10,7 @@ export const appClients = new Set<ServerWebSocket<WsData>>();
 
 // Claude Code hooks call back into this server; the token only exists in the env we give Claude.
 export const HOOK_TOKEN = crypto.randomUUID();
-export const claude = new ClaudeSession(LATEX, { UNDERLEAF_HOOK_TOKEN: HOOK_TOKEN }, () => endTurn());
+export const claude = new ClaudeSession("", { UNDERLEAF_HOOK_TOKEN: HOOK_TOKEN }, () => endTurn()); // folder set when a workspace opens
 
 /** Most recent document opened in any tab, for Claude's workspace snapshot. */
 export let lastOpened: string | null = null;

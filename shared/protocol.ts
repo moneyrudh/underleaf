@@ -12,8 +12,12 @@ export const API = {
   pdf: "/api/pdf",
   /** GET ?path= — a file from the tree (`&download` to save it). */
   file: "/api/file",
-  /** POST ExportRequest → ExportResponse — copy a document's PDF into the output folder. */
-  export: "/api/export",
+  /** POST SavedRequest → SavedResponse — record that a document's PDF was saved (a marker in its history). */
+  saved: "/api/saved",
+  /** POST OpenWorkspaceRequest → OpenWorkspaceResponse — switch to another folder. */
+  workspaceOpen: "/api/workspace/open",
+  /** POST → PickFolderResponse — show the system's folder dialog (on the machine running underleaf) and open the choice. */
+  workspacePick: "/api/workspace/pick",
   /** GET ?path= → HistoryResponse — a file's versions, newest first. */
   history: "/api/history",
   /** GET ?commit=&path= — a file as it was at a snapshot. */
@@ -59,7 +63,9 @@ export type CompiledMessage = {
   diagnostics: Diagnostic[];
   pdf: string | null; // the latest good PDF, or null if it has never compiled
 };
-export type ServerMessage = TreeMessage | HistoryMessage | CompilingMessage | CompiledMessage;
+/** Which folder is open, sent on connect and whenever it changes. A tab reloads when the id changes. */
+export type WorkspaceMessage = { type: "workspace"; id: string; dir: string; name: string; recent: { dir: string; name: string }[] };
+export type ServerMessage = WorkspaceMessage | TreeMessage | HistoryMessage | CompilingMessage | CompiledMessage;
 
 // ---------- websocket: page → server ----------
 
@@ -74,8 +80,13 @@ export type ClaudeClientMessage =
 
 // ---------- request / response bodies ----------
 
-export type ExportRequest = { doc: string };
-export type ExportResponse = { path: string } | { error: string };
+/** `name` is the file name the PDF was saved as (the page can't see the folder). */
+export type SavedRequest = { doc: string; name: string; how: "saved" | "downloaded" };
+export type SavedResponse = { ok: true } | { error: string };
+
+export type OpenWorkspaceRequest = { dir: string };
+export type OpenWorkspaceResponse = { ok: true } | { error: string };
+export type PickFolderResponse = { ok: true; dir: string } | { cancelled: true } | { error: string };
 
 export type HistoryResponse = { enabled: boolean; snapshots: Snapshot[] };
 export type HistoryPdfError = { error: string; diagnostics: Diagnostic[] };

@@ -19,10 +19,20 @@ export const STORED = {
 export type StoredKey = (typeof STORED)[keyof typeof STORED] | `--${string}`;
 
 /** localStorage that never throws (private windows, blocked storage). */
+/** Keys that belong to one workspace (its files), stored separately per workspace. */
+const PER_WORKSPACE = new Set<string>([STORED.selected, STORED.recent, STORED.expanded]);
+let scope = "";
+
+/** Set once the server says which workspace is open, before anything reads a per-workspace key. */
+export function setStorageScope(workspaceId: string) {
+  scope = workspaceId;
+}
+
 export function storage(key: StoredKey, value?: string): string | null {
+  const name = PER_WORKSPACE.has(key) ? `underleaf:${scope}:${key}` : `underleaf:${key}`;
   try {
-    if (value !== undefined) localStorage.setItem(`underleaf:${key}`, value);
-    return localStorage.getItem(`underleaf:${key}`);
+    if (value !== undefined) localStorage.setItem(name, value);
+    return localStorage.getItem(name);
   } catch {
     return null;
   }
@@ -33,8 +43,16 @@ export function toast(text: string) {
   const el = $("toast");
   el.textContent = text;
   el.hidden = false;
+  replay(el, "pop"); // a repeat of the same message still visibly lands
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 3000);
+}
+
+/** Restart a one-shot CSS animation class, even if it's still running. */
+export function replay(el: HTMLElement, cls: string) {
+  el.classList.remove(cls);
+  void el.offsetWidth; // reflow, so re-adding the class starts the animation over
+  el.classList.add(cls);
 }
 
 export function formatBytes(n: number) {

@@ -72,6 +72,17 @@ export class ClaudeSession {
     this.proc?.kill();
   }
 
+  /** The folder `claude` runs in (set before the first tab attaches). */
+  setCwd(dir: string) {
+    this.cwd = dir;
+  }
+
+  /** Switch folders: a running session restarts there and picks up that folder's last conversation. */
+  moveTo(dir: string) {
+    this.cwd = dir;
+    if (this.proc) this.restart("continue");
+  }
+
   private async start(start: ClaudeStart) {
     const bin = process.env.UNDERLEAF_CLAUDE_BIN ?? Bun.which("claude"); // the override is for tests (a stand-in CLI)
     if (!bin) {

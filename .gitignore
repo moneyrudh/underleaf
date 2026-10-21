@@ -332,7 +332,7 @@ TSWLatexianTemp*
 
 ## underleaf
 node_modules/
-build/
+/build/
 # your own documents and exported PDFs stay local
 latex/
 resumes/

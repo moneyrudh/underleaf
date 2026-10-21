@@ -1,12 +1,12 @@
 import path from "node:path";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, rename } from "node:fs/promises";
 import { compile, type CompileResult } from "./compile";
-import { BUILD, LATEX, RESUMES } from "../server/config";
+import { current, generation } from "../server/workspace";
 import { send } from "../server/clients";
 import { scheduleBrief } from "../server/trees";
 import { API, url, type CompiledMessage } from "../../shared/protocol";
 
-/** Compiling documents: one build at a time per document, the last good PDF kept, exports. */
+/** Compiling documents: one build at a time per document, the last good PDF kept. */
 
 type DocState = {
   last?: CompileResult;
@@ -35,7 +35,12 @@ export const isStale = (doc: string) => {
 };
 
 export const relDoc = (doc: string) => doc.slice("latex/".length);
-const outDirOf = (doc: string) => path.join(BUILD, relDoc(doc).replace(/\.tex$/, ""));
+const outDirOf = (doc: string) => path.join(current().build, relDoc(doc).replace(/\.tex$/, ""));
+
+/** Forget every document's build (the workspace changed). Builds still running are discarded when they finish. */
+export function resetBuilds() {
+  states.clear();
+}
 // The last successful PDF is kept separately so a broken build never blanks the preview.
 export const goodPdfOf = (doc: string) => path.join(outDirOf(doc), "underleaf-latest.pdf");
 
@@ -51,9 +56,15 @@ export async function build(doc: string) {
       s.queued = false;
       send(doc, { type: "compiling", doc });
       s.builtAt = Date.now();
-      const result = await compile(path.join(LATEX, relDoc(doc)), outDirOf(doc));
+      const gen = generation;
+      const result = await compile(path.join(current().dir, relDoc(doc)), outDirOf(doc));
+      if (gen !== generation) return; // the workspace changed meanwhile: this build belongs to the old one
       if (result.ok) {
-        await copyFile(result.pdfPath, goodPdfOf(doc));
+        // Copy beside it, then rename over it (atomic): a page fetching the PDF mid-copy gets the old
+        // one or the new one, never a truncated file it might save somewhere.
+        const good = goodPdfOf(doc);
+        await copyFile(result.pdfPath, `${good}.tmp`);
+        await rename(`${good}.tmp`, good);
         s.version++;
       }
       s.last = result;
@@ -80,12 +91,4 @@ export function compiledMessage(doc: string): CompiledMessage {
     diagnostics: r.diagnostics,
     pdf: s.version > 0 ? url(API.pdf, { doc, v: s.version }) : null,
   };
-}
-
-/** Exported PDFs mirror the source layout: latex/acme/main.tex → resumes/acme/main.pdf */
-export async function exportDoc(doc: string) {
-  const dest = path.join(RESUMES, relDoc(doc).replace(/\.tex$/, ".pdf"));
-  await mkdir(path.dirname(dest), { recursive: true });
-  await copyFile(goodPdfOf(doc), dest);
-  return `resumes/${path.relative(RESUMES, dest)}`;
 }

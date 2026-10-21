@@ -9,7 +9,7 @@
  */
 import os from "node:os";
 import path from "node:path";
-import { chmod, cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, rename, rm, stat } from "node:fs/promises";
 import { REPO } from "../src/repo";
 import { API, url } from "../shared/protocol";
 
@@ -31,10 +31,17 @@ if (!chrome) {
 
 const tmp = await mkdtemp(path.join(os.tmpdir(), "underleaf-smoke-"));
 const latex = path.join(tmp, "latex");
-const resumes = path.join(tmp, "resumes");
+const other = path.join(tmp, "other"); // a second workspace to switch to
+const downloads = path.join(tmp, "downloads");
 const home = path.join(tmp, "home");
 await mkdir(latex, { recursive: true });
-await mkdir(resumes, { recursive: true });
+await mkdir(path.join(latex, "memory"), { recursive: true });
+await mkdir(other, { recursive: true });
+await mkdir(downloads, { recursive: true });
+// Agent files, as a resume workspace has them (folders you open don't get them added).
+await Bun.write(path.join(latex, "CLAUDE.md"), "# Claude\n");
+await Bun.write(path.join(latex, "memory", "profile.md"), "# Profile\n");
+await Bun.write(path.join(other, "other.tex"), "\\documentclass{article}\n\\begin{document}\nThe other workspace.\n\\end{document}\n");
 const main = path.join(latex, "main.tex");
 await cp(path.join(REPO, "templates", "resume.tex"), main);
 await Bun.write(path.join(latex, "notes.md"), "# notes\n\n- first\n");
@@ -42,7 +49,7 @@ await Bun.write(path.join(latex, "notes.md"), "# notes\n\n- first\n");
 // A stand-in for the Claude Code CLI: notes the hook token it was given, prints a line, then echoes input.
 const fakeClaude = path.join(tmp, "fake-claude");
 const tokenFile = path.join(tmp, "hook-token");
-await Bun.write(fakeClaude, `#!/bin/sh\nprintf '%s' "$UNDERLEAF_HOOK_TOKEN" > '${tokenFile}'\necho 'fake claude ready'\nexec cat\n`);
+await Bun.write(fakeClaude, `#!/bin/sh\nprintf '%s' "$UNDERLEAF_HOOK_TOKEN" > '${tokenFile}'\necho "fake claude ready in $(basename "$PWD")"\nexec cat\n`);
 await chmod(fakeClaude, 0o755);
 
 // History with a few versions: init → two edits. history.ts reads UNDERLEAF_HOME when it's
@@ -62,7 +69,7 @@ await store.snapshot({ kind: "claude", author: "Claude", label: "Claude: Tighten
 
 const port = freePort();
 const debugPort = freePort();
-const server = Bun.spawn(["bun", path.join(REPO, "src/server.ts"), latex, "--resumes", resumes, "--port", String(port), "--no-open"], {
+const server = Bun.spawn(["bun", path.join(REPO, "src/server.ts"), latex, "--port", String(port), "--no-open"], {
   env: { ...process.env, UNDERLEAF_HOME: home, UNDERLEAF_CLAUDE_BIN: fakeClaude },
   stdout: "pipe",
   stderr: "pipe",
@@ -166,7 +173,7 @@ await cdp.send("Page.navigate", { url: `http://localhost:${port}/#latex/main.tex
 
 await check("opens and compiles the document", async () => {
   await waitFor("document.querySelectorAll('#viewer canvas.page').length > 0", "first PDF page", 20_000);
-  expect((await status()).startsWith("Built"), `status: ${await status()}`);
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "the Built status", 20_000); // a background build may still be finishing
   const files = await js<string>("[...document.querySelectorAll('#tree .row .name')].map(n => n.textContent).join(',')");
   expect(files.includes("main.tex") && files.includes("notes.md"), `tree: ${files}`);
 });
@@ -275,10 +282,30 @@ await check("restores an earlier version (two clicks), file changes on disk", as
   await until(async () => (await Bun.file(main).text()).includes("Owned the order-status service"), 10_000, "restored text on disk");
 });
 
-await check("Save PDF (mod+S) exports to the output folder", async () => {
+await check("Save PDF (mod+S) asks where once, then saves over that file", async () => {
   await waitFor("document.getElementById('status').textContent.startsWith('Built')", "built", 20_000);
+  // Stand in for the system save dialog: count dialogs and writes, and keep the first bytes written.
+  await js(`window.__save = { picks: 0, writes: 0, head: "" };
+    window.showSaveFilePicker = async () => {
+      window.__save.picks++;
+      return { name: "draft.pdf", kind: "file", queryPermission: async () => "granted",
+        createWritable: async () => ({ write: async (b) => { window.__save.head = await b.slice(0, 4).text(); }, close: async () => { window.__save.writes++; } }) };
+    }`);
   await press("s", [MOD]);
-  await until(async () => (await Bun.file(path.join(resumes, "main.pdf")).exists()), 10_000, "resumes/main.pdf");
+  await waitFor("window.__save.writes === 1 && window.__save.picks === 1 && window.__save.head === '%PDF'", "first save, through the dialog");
+  await press("s", [MOD]);
+  await waitFor("window.__save.writes === 2", "second save");
+  expect((await js<number>("window.__save.picks")) === 1, "asked where a second time");
+  await click("#save-more");
+  await waitFor("!document.getElementById('save-menu').hidden && document.getElementById('save-again-name').textContent === 'draft.pdf'", "Save again names the file");
+  await press("Escape");
+});
+
+await check("Save to Downloads downloads the PDF", async () => {
+  await cdp.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: downloads });
+  await click("#save-more");
+  await click("#save-menu [data-command='save-downloads']");
+  await until(async () => (await Bun.file(path.join(downloads, "main.pdf")).exists()), 10_000, "main.pdf in Downloads");
 });
 
 await check("quick open (mod+P) lists files and opens one", async () => {
@@ -324,7 +351,106 @@ await check("Claude hooks: a turn becomes one labelled snapshot; a wrong token i
   const labels = async () =>
     ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.map((s) => s.label);
   await until(async () => (await labels()).includes("Claude: Make the summary punchier"), 10_000, "Claude snapshot");
-  expect((await labels()).some((l) => l.startsWith("Exported resumes/main.pdf")), "no export snapshot from Save PDF");
+  // Two ⌘S and a download with nothing changed in between: one marker, not three.
+  const saves = (await labels()).filter((l) => l.startsWith("Saved as") || l.startsWith("Downloaded"));
+  expect(saves.length === 1 && saves[0] === "Saved as draft.pdf", `save markers: ${saves.join(" | ") || "none"}`);
+});
+
+await check("saving after a change leaves a new marker", async () => {
+  // Quick open moved to notes.md; back to main.tex, which the hooks check above changed since the last save.
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "main.tex" });
+  await press("Enter");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
+  await press("s", [MOD]);
+  const saveMarkers = async () =>
+    ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.filter((s) => s.label === "Saved as draft.pdf").length;
+  await until(async () => (await saveMarkers()) === 2, 10_000, "a second save marker");
+});
+
+await check("won't save while the latest build has failed (the PDF would be older than the source)", async () => {
+  const writes = await js<number>("window.__save.writes");
+  const good = await Bun.file(main).text();
+  await Bun.write(main, good.replace("\\end{document}", "\\undefinedcommand\n\\end{document}"));
+  await waitFor("document.getElementById('status').dataset.state === 'fail' || /error/.test(document.getElementById('status').textContent)", "build failed", 20_000);
+  await press("s", [MOD]);
+  await waitFor("/build failed/.test(document.getElementById('toast').textContent)", "explains why it didn't save");
+  expect((await js<number>("window.__save.writes")) === writes, "saved anyway");
+  await Bun.write(main, good);
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "builds again", 20_000);
+  // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "notes" });
+  await press("Enter");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
+});
+
+const openFolder = (dir: string) =>
+  fetch(`http://localhost:${port}${API.workspaceOpen}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir }) });
+
+await check("refuses folders inside underleaf's checkout, without writing to them", async () => {
+  const templates = path.join(REPO, "templates", "workspace");
+  const res = await openFolder(templates);
+  expect(res.status === 400, `templates/workspace: status ${res.status}`);
+  expect(!(await Bun.file(path.join(templates, ".underleaf", "id")).exists()), "an id was written into the template");
+});
+
+await check("a folder that can't be opened leaves the current workspace running", async () => {
+  const locked = path.join(tmp, "locked");
+  await mkdir(locked);
+  await Bun.write(path.join(locked, "x.tex"), "\\documentclass{article}\n\\begin{document}x\\end{document}\n");
+  await chmod(locked, 0o555);
+  try {
+    const res = await openFolder(locked);
+    const body = (await res.json()) as { error?: string };
+    expect(res.status === 400 && /can't write/.test(body.error ?? ""), `read-only folder: ${res.status} ${body.error}`);
+  } finally {
+    await chmod(locked, 0o755);
+  }
+  // The old workspace still watches its files: a new one shows up in the tree.
+  await Bun.write(path.join(latex, "after-refusal.md"), "still here\n");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'after-refusal.md')", "new file listed", 10_000);
+});
+
+await check("switching workspaces swaps the files, the title and Claude's folder", async () => {
+  await js(`fetch("/api/workspace/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: ${JSON.stringify(other)} }) })`);
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'other.tex')", "the other workspace's files", 20_000);
+  await waitFor("document.querySelector('#workspace-btn .ws-name').textContent === 'other'", "title bar names it");
+  expect(!(await js<boolean>("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'main.tex')")), "old files still listed");
+  await waitFor("document.querySelector('#terminal .xterm-rows')?.textContent.includes('fake claude ready in other')", "Claude restarted in the other folder");
+});
+
+await check("switching back from the title bar restores that workspace's history and open file", async () => {
+  await click("#workspace-btn");
+  await waitFor("[...document.querySelectorAll('.menu li .label')].some(l => l.textContent === 'latex')", "recent workspaces listed");
+  await js("[...document.querySelectorAll('.menu li')].find(li => li.querySelector('.label')?.textContent === 'latex').click()");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'main.tex')", "back in the first workspace", 20_000);
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "its last open file (notes.md) reopened");
+});
+
+await check("a copied folder gets its own id and history, starting from the original's", async () => {
+  const copy = path.join(tmp, "latex-copy");
+  await cp(latex, copy, { recursive: true }); // like Finder's Duplicate: .underleaf/id comes along
+  expect((await openFolder(copy)).status === 200, "couldn't open the copy");
+  await waitFor("document.querySelector('#workspace-btn .ws-name')?.textContent === 'latex-copy'", "title bar names the copy", 20_000);
+  const idOf = async (dir: string) => (await Bun.file(path.join(dir, ".underleaf", "id")).text()).trim();
+  expect((await idOf(copy)) !== (await idOf(latex)), "the copy kept the original's id");
+  const labels = ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.map((s) => s.label);
+  expect(labels.includes("Claude: Tighten the bullets"), `the copy's history doesn't start from the original's: ${labels.join(" | ")}`);
+});
+
+await check("a workspace folder that disappears isn't recreated", async () => {
+  const doomed = path.join(tmp, "doomed");
+  await mkdir(doomed);
+  await Bun.write(path.join(doomed, "d.tex"), "\\documentclass{article}\n\\begin{document}d\\end{document}\n");
+  expect((await openFolder(doomed)).status === 200, "couldn't open the folder");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'd.tex')", "its files", 20_000);
+  await rename(doomed, path.join(tmp, "doomed-moved")); // as if moved to the trash
+  await waitFor("![...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'd.tex')", "files gone from the tree", 10_000);
+  await Bun.sleep(1500); // past the 1 s health check (and the brief's debounce)
+  expect(!(await Bun.file(doomed).exists()) && !(await stat(doomed).catch(() => null)), "the folder was recreated");
 });
 
 await check("no errors in the page", async () => {

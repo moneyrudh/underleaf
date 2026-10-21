@@ -1,8 +1,11 @@
+import type { Server } from "bun";
 import path from "node:path";
 import index from "../../public/index.html";
 import { REPO } from "../repo";
-import { PORT, ROOTS } from "./config";
-import { build, compiledMessage, exportDoc, goodPdfOf, isStale, relDoc, stateOf } from "../build/builds";
+import { PORT } from "./config";
+import { current, tryOpenWorkspace, workspaceMessage } from "./workspace";
+import { pickFolder } from "../workspace/pick";
+import { build, compiledMessage, goodPdfOf, isStale, relDoc, stateOf } from "../build/builds";
 import { appClients, broadcast, claude, HOOK_TOKEN, setLastOpened, type WsData } from "./clients";
 import { buildSnapshot, cancelEditSnapshot, history, onClaudeHook, snapshot } from "../history/snapshots";
 import { docs, scheduleBrief, treeMessage } from "./trees";
@@ -14,8 +17,11 @@ import {
   SOCKETS,
   type ClaudeClientMessage,
   type ClientMessage,
-  type ExportRequest,
-  type ExportResponse,
+  type OpenWorkspaceRequest,
+  type OpenWorkspaceResponse,
+  type PickFolderResponse,
+  type SavedRequest,
+  type SavedResponse,
   type HistoryPdfError,
   type HistoryResponse,
   type RestoreRequest,
@@ -28,6 +34,31 @@ import {
 const safeRel = (p: string | null) =>
   p && !p.startsWith("/") && !p.includes("\\") && !p.split("/").includes("..") ? p : null;
 const safeCommit = (c: string | null) => (c && /^[0-9a-f]{7,40}$/.test(c) ? c : null);
+
+/** Saves are recorded one at a time, so two quick saves can't both decide there's no marker yet. */
+let saveQueue: Promise<unknown> = Promise.resolve();
+function oneSaveAtATime(fn: () => Promise<Response>): Promise<Response> {
+  const next = saveQueue.then(fn, fn);
+  saveQueue = next.catch(() => {});
+  return next;
+}
+
+async function recordSave(req: Request): Promise<Response> {
+  if (!trusted(req)) return forbidden();
+  const { doc, name, how } = (await req.json().catch(() => ({}))) as Partial<SavedRequest>;
+  const file = typeof name === "string" ? path.basename(name).slice(0, 200) : "";
+  if (!doc || !docs.includes(doc) || !file) return Response.json({ error: "Bad request" } satisfies SavedResponse, { status: 400 });
+  // An empty commit marks the moment: "the version I sent" stays findable in the file's history.
+  // Saving again with nothing changed since the last save adds nothing, so repeated saves don't
+  // fill the timeline. "Changed" covers every file: an \input chapter changes the PDF too.
+  const lastSave = history ? (await history.log(relDoc(doc))).find((s) => s.kind === "export") : undefined;
+  const unchanged = !!lastSave && (await history!.unchangedSince(lastSave.id));
+  if (!unchanged) {
+    const label = how === "downloaded" ? `Downloaded ${file}` : `Saved as ${file}`;
+    await snapshot({ kind: "export", author: "You", label, allowEmpty: true, about: relDoc(doc) });
+  }
+  return Response.json({ ok: true } satisfies SavedResponse);
+}
 
 // The server can drive a shell-capable agent, so only talk to pages served by
 // this server: reject foreign Origins (cross-site requests) and Hosts (DNS rebinding).
@@ -71,7 +102,7 @@ export function startServer() {
       [API.file]: async (req: Request) => {
         if (!trusted(req)) return forbidden();
         const url = new URL(req.url);
-        const abs = await resolveTreePath(ROOTS, url.searchParams.get("path") ?? "");
+        const abs = await resolveTreePath(current().roots, url.searchParams.get("path") ?? "");
         if (!abs) return new Response("Not found", { status: 404 });
         const ext = path.extname(abs).toLowerCase();
         const headers: Record<string, string> = {
@@ -149,16 +180,32 @@ export function startServer() {
         },
       },
 
-      [API.export]: {
+      [API.saved]: {
+        POST: (req: Request) => oneSaveAtATime(() => recordSave(req)),
+      },
+
+      [API.workspaceOpen]: {
         POST: async (req: Request) => {
           if (!trusted(req)) return forbidden();
-          const { doc } = (await req.json().catch(() => ({}))) as Partial<ExportRequest>;
-          if (!doc || !docs.includes(doc) || stateOf(doc).version === 0) {
-            return Response.json({ error: "Nothing to export yet — fix the build first." } satisfies ExportResponse, { status: 400 });
+          const { dir } = (await req.json().catch(() => ({}))) as Partial<OpenWorkspaceRequest>;
+          const problem = typeof dir === "string" && dir ? await tryOpenWorkspace(path.resolve(dir)) : "Bad request";
+          if (problem) return Response.json({ error: problem } satisfies OpenWorkspaceResponse, { status: 400 });
+          return Response.json({ ok: true } satisfies OpenWorkspaceResponse);
+        },
+      },
+
+      [API.workspacePick]: {
+        POST: async (req: Request, server: Server<WsData>) => {
+          if (!trusted(req)) return forbidden();
+          server.timeout(req, 0); // the dialog stays open as long as you browse; Bun would cut the request at 10 s
+          const choice = await pickFolder();
+          if (choice === null) return Response.json({ cancelled: true } satisfies PickFolderResponse);
+          if (choice === "unsupported") {
+            return Response.json({ error: "No folder dialog on this system. Start underleaf with the folder instead: bun dev <folder>" } satisfies PickFolderResponse, { status: 501 });
           }
-          const exported = await exportDoc(doc);
-          snapshot({ kind: "export", author: "You", label: `Exported ${exported}`, allowEmpty: true, about: relDoc(doc) });
-          return Response.json({ path: exported } satisfies ExportResponse);
+          const problem = await tryOpenWorkspace(choice);
+          if (problem) return Response.json({ error: problem } satisfies PickFolderResponse, { status: 400 });
+          return Response.json({ ok: true, dir: choice } satisfies PickFolderResponse);
         },
       },
     },
@@ -176,7 +223,11 @@ export function startServer() {
       open(ws) {
         if (ws.data.channel === "claude") return claude.attach(ws);
         appClients.add(ws);
-        ws.send(treeMessage());
+        // Which folder first (the page scopes its saved state by it), then its files.
+        workspaceMessage().then((msg) => {
+          ws.send(JSON.stringify(msg));
+          ws.send(JSON.stringify(treeMessage()));
+        });
       },
       message(ws, raw) {
         if (ws.data.channel === "claude") {

@@ -15,7 +15,7 @@ switch (command) {
     break;
   default:
     console.log(`usage:
-  bun dev [latex-dir] [--resumes dir]  open the app (defaults: latex/ and resumes/)
+  bun dev [folder]                     open the app on a folder (default: the last one you had open)
   bun run pdf <file.tex> [out.pdf]     compile once and write the PDF
   bun run doctor                       check your LaTeX install`);
     process.exit(command ? 1 : 0);

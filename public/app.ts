@@ -2,6 +2,7 @@ import { label } from "./core/keys";
 import { installHints } from "./ui/hints";
 import { initLayout, focusPane } from "./core/layout";
 import { initOpening } from "./files/open";
+import { initWorkspaces } from "./files/workspaces";
 import { initCheatsheet } from "./ui/cheatsheet";
 import { commandAvailable, installCommands, runCommand } from "./core/commands";
 import { installPopovers } from "./ui/popover";
@@ -23,6 +24,7 @@ import { STORED, storage } from "./core/util";
 
 initLayout();
 initOpening();
+initWorkspaces();
 initCheatsheet();
 installCommands();
 installPopovers({ run: runCommand, available: commandAvailable });

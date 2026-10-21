@@ -29,21 +29,31 @@ If `doctor` can't find LaTeX:
 ## Usage
 
 ```sh
-bun dev                       # opens http://localhost:4747
+bun dev                       # opens http://localhost:4747 on the folder you had open last
+bun dev ~/Documents/thesis    # opens a specific folder
 bun dev examples              # try the bundled example
 bun run pdf latex/main.tex    # one-off export from the terminal
 ```
 
-Options: `bun dev [latex-dir] [--resumes dir] [--port N] [--no-open]`.
+Options: `bun dev [folder] [--port N] [--no-open]`.
 
-### Folders
+### Workspaces
 
-| Folder | What it's for |
+A workspace is one folder of documents: a thesis, a set of resumes, a paper. Each has its own files, version history, and Claude conversation, so a thesis and a resume never share instructions or memory.
+
+The folder name in the title bar switches between workspaces you've opened, and **Open folder…** opens another one with your system's folder dialog (also in the command palette, along with **Switch workspace…**). Switching swaps the file tree, the history and Claude's folder; Claude picks up that folder's last conversation. underleaf adds two small things to a folder you open: `.underleaf/` (the history id and a status file for Claude) and its hooks in `.claude/settings.json`.
+
+With no folder given, a fresh checkout uses its own `latex/` folder (git-ignored, so personal files never end up in this repo) and gives it the starter resume setup: a `resume.tex` from `templates/resume.tex` plus the agent files below. Folders you open don't get those added.
+
+### Saving PDFs
+
+| Action | What it does |
 |---|---|
-| `latex/` | Your sources. Everything in here shows up in the file tree, and Claude works here. |
-| `resumes/` | Exported PDFs. **Save PDF** writes here, mirroring the source path (`latex/acme/main.tex` → `resumes/acme/main.pdf`). |
+| **Save PDF** (⌘S) | Saves over the file you last saved this document to. The first time, it asks where (like Save As). |
+| **Save As…** (⌘⇧S) | Your system's save dialog. The file you choose becomes what ⌘S saves over. |
+| **Save to Downloads** | A plain download, a new file each time. |
 
-On first run, an empty `latex/` gets a starter `resume.tex` copied from `templates/resume.tex`. Both folders are git-ignored, so personal files never end up in this repo. You can make either one its own git repo if you want history. If you delete or rename either folder while the app is running, underleaf recreates it empty and keeps going.
+Each document remembers its own file. The save dialog needs Chrome or Edge; in other browsers, Save PDF and Save As download instead. Every save leaves a marker in the document's version history ("Saved as draft-3.pdf"), so you can always get back the exact version you sent. Saving waits for a good build: while the document is building, or if its latest build failed, the PDF on screen is older than your source, so Save says why instead of saving.
 
 ### The file tree
 
@@ -53,7 +63,7 @@ Click a folder to expand it, and click a file to open it:
 |---|---|
 | `.tex` with `\documentclass` | Compiles and previews live, with errors in **Logs**, page count, and **Save PDF** |
 | `.tex` without it (`\input` fragments) | Shown as source. Saving it still rebuilds whichever document you have open. |
-| `.pdf` | Rendered (handy for checking what's in `resumes/`) |
+| `.pdf` | Rendered |
 | images | Shown as-is |
 | `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Shown as text |
 | anything else | Listed, with a download button |
@@ -91,7 +101,7 @@ underleaf snapshots `latex/` automatically, so you can look back at any earlier 
 |---|---|
 | You pause editing for ~10 seconds | "You edited main.tex" |
 | Claude finishes a turn that changed files | "Claude: *your prompt*" |
-| You press **Save PDF** | "Exported resumes/…" (so every PDF you sent maps to its exact source) |
+| You save a PDF | "Saved as draft-3.pdf" or "Downloaded main.pdf" (so every PDF you sent maps to its exact source) |
 
 The **version bar** above the preview is a timeline of the open file: oldest on the left, **Now** on the right. Hover a dot for its label, click it to open that version, or step through with `,` (older) and `.` (newer). Press `V` to hide or show the bar. For the full list with labels, open **History** in the preview toolbar (or press `H`). Click a snapshot to preview that version (documents are compiled as they were). **Restore this version** puts it back, and the version it replaces is saved first, so a restore can be undone too. History follows renames.
 
@@ -114,7 +124,7 @@ Press `?` (or the **?** button) for the full list. The essentials:
 |---|---|
 | `⌘P` / `Ctrl+P` | Go to file (fuzzy search) |
 | `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
-| `⌘S` / `Ctrl+S` | Save PDF to `resumes/` |
+| `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…) |
 | `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
 | `Ctrl+Space` then `z` | Zoom the focused pane |
 
@@ -134,7 +144,7 @@ The server only listens on `127.0.0.1`, and it rejects requests from other origi
 
 ## How it works
 
-The server (`src/`) watches `latex/` and `resumes/`, compiles through `src/build/compile.ts` into `build/`, runs Claude Code through `src/claude/session.ts`, and talks to the browser over WebSockets; `src/server.ts` lists the pieces. `bun run smoke` runs an end-to-end check in headless Chrome. The UI in `public/` renders PDFs with [pdf.js](https://mozilla.github.io/pdf.js/) and the terminal with [xterm.js](https://xtermjs.org/).
+The server (`src/`) watches the open workspace, compiles through `src/build/compile.ts` into `build/`, runs Claude Code through `src/claude/session.ts`, and talks to the browser over WebSockets; `src/server.ts` lists the pieces. `bun run smoke` runs an end-to-end check in headless Chrome. The UI in `public/` renders PDFs with [pdf.js](https://mozilla.github.io/pdf.js/) and the terminal with [xterm.js](https://xtermjs.org/).
 
 ---
 

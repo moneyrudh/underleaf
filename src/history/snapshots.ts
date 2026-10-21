@@ -1,6 +1,6 @@
 import path from "node:path";
 import { compile, type CompileResult } from "../build/compile";
-import { BUILD, LATEX } from "../server/config";
+import { current } from "../server/workspace";
 import { HistoryStore, editLabel } from "./store";
 import { broadcast } from "../server/clients";
 import type { Snapshot } from "../../shared/types";
@@ -9,7 +9,7 @@ import type { Snapshot } from "../../shared/types";
  * When snapshots are taken. They land in ~/.underleaf/history/<workspace id>.git. Three triggers:
  *   • a Claude turn ends (Stop hook)          → "Claude: <prompt>"
  *   • you stop editing for EDIT_IDLE_MS         → "You edited main.tex"
- *   • Save PDF                                  → "Exported resumes/…"
+ *   • Save PDF / Save to Downloads              → "Saved as draft-3.pdf"
  */
 
 const EDIT_IDLE_MS = 10_000;
@@ -20,12 +20,21 @@ export let history: HistoryStore | null = null;
 let turn: { prompt: string; since: number } | null = null;
 let editTimer: Timer | undefined;
 
-export async function openHistory() {
-  history = await HistoryStore.open(LATEX).catch((e) => {
+export async function openHistory(dir: string) {
+  history = await HistoryStore.open(dir).catch((e) => {
     console.error(`history disabled: ${(e as Error).message}`);
     return null;
   });
   if (!history) console.log("history   disabled (git not found)");
+}
+
+/** The workspace is closing: forget its history, pending edit snapshot, Claude turn and old-version builds. */
+export function closeHistory() {
+  clearTimeout(editTimer);
+  editTimer = undefined;
+  turn = null;
+  history = null;
+  historyBuilds.clear();
 }
 
 function claudeIsWorking() {
@@ -90,7 +99,6 @@ export async function onClaudeHook(event: string, body: { prompt?: string }) {
 }
 
 /** Compiled PDFs of past versions, one build per (snapshot, document). */
-const HISTORY_BUILD = path.join(BUILD, ".history");
 const historyBuilds = new Map<string, Promise<CompileResult | null>>();
 
 export function buildSnapshot(commit: string, rel: string): Promise<CompileResult | null> {
@@ -98,7 +106,7 @@ export function buildSnapshot(commit: string, rel: string): Promise<CompileResul
   let pending = historyBuilds.get(key);
   if (!pending) {
     pending = (async () => {
-      const root = path.join(HISTORY_BUILD, commit);
+      const root = path.join(current().build, ".history", commit);
       const src = path.join(root, "src");
       if (!(await Bun.file(path.join(src, rel)).exists())) await history!.exportTree(commit, src);
       return compile(path.join(src, rel), path.join(root, "out", rel.replace(/\.tex$/, "")));

@@ -31,7 +31,7 @@ export async function viewSnapshot(snap: Snapshot) {
   closeCompare();
   versions.showViewing(snap);
   if (preview.hasContent()) preview.beginLoading({ keepScroll: true }); // same file: keep your place
-  ui.exportButton.hidden = ui.download.hidden = true; // an earlier version can't be saved; zoom still works
+  ui.save.hidden = ui.download.hidden = true; // an earlier version can't be saved; zoom still works
   const where = `${snap.label} · ${relativeTime(snap.time)}`;
   const at = { commit: snap.id, path: snap.path };
 
@@ -75,7 +75,7 @@ async function restoreSnapshot(snap: Snapshot) {
     !changed
       ? `${selected.name} already matches this version. Nothing to restore.`
       : snap.kind === "export"
-        ? `Restored ${selected.name} to the exported version. The version you replaced is saved in history.`
+        ? `Restored ${selected.name} to the saved version. The version you replaced is saved in history.`
         : `Restored ${selected.name}. The version you replaced is saved in history.`,
   );
   open(selected);

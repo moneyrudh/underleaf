@@ -9,7 +9,8 @@ import { claude, focusPane } from "../core/layout";
 import { hideDocumentActions, state, ui } from "../core/state";
 import { $, escapeHtml, formatBytes, STORED, storage, toast } from "../core/util";
 import type { DirNode, FileNode } from "../../shared/types";
-import { API, url, type ExportRequest, type ExportResponse } from "../../shared/protocol";
+import { API, url } from "../../shared/protocol";
+import { loadSaveTarget, savePdf } from "./save";
 
 /** Opening files, keeping the preview in step with the file tree, and acting on files. */
 
@@ -17,7 +18,7 @@ export const tree = new FileTree($("tree"), { onOpen: (file) => open(file) });
 let firstTree = true;
 
 export function initOpening() {
-  ui.exportButton.onclick = exportPdf;
+  ui.exportButton.onclick = savePdf;
   $("agent-toggle").onclick = () => toggleAgentFiles(!tree.agentFilesVisible);
   $("quick-open").onclick = quickOpen;
   window.addEventListener("hashchange", () => {
@@ -28,13 +29,14 @@ export function initOpening() {
 
 export function onTree(trees: DirNode[]) {
   tree.update(trees);
-  showWorkspace();
   showAgentFoot();
 
   if (firstTree) {
     firstTree = false;
-    const wanted = decodeURIComponent(location.hash.slice(1)) || storage(STORED.selected);
-    const file = (wanted && tree.find(wanted)) || tree.firstDocument();
+    // The address (a link or a reload), else this workspace's last open file, else its first document.
+    // The address can name a file from another workspace after a switch, so each is tried in turn.
+    const fromHash = decodeURIComponent(location.hash.slice(1));
+    const file = (fromHash && tree.find(fromHash)) || tree.find(storage(STORED.selected) ?? "") || tree.firstDocument();
     if (file) open(file);
     else showNothing();
     return;
@@ -80,15 +82,17 @@ export function open(file: FileNode) {
 
   const isDoc = file.kind === "doc";
   const fileUrl = url(API.file, { path: file.path, v: file.mtime });
-  ui.exportButton.hidden = !isDoc;
+  ui.save.hidden = !isDoc;
   preview.showLogsButton(isDoc);
   ui.zoom.hidden = !(isDoc || file.kind === "pdf");
-  ui.download.hidden = isDoc; // documents get a download link once they've compiled
+  ui.download.hidden = isDoc; // documents save through the Save menu instead
   ui.download.href = `${fileUrl}&download`;
 
   if (isDoc) {
+    if (switching) loadSaveTarget();
     if (switching) {
       state.lastPdf = null;
+      state.build = "running";
       ui.exportButton.disabled = true;
       preview.setStatus("Building…", "busy");
       if (!preview.hasContent()) preview.showMessage("Compiling…"); // nothing to keep on screen meanwhile
@@ -125,13 +129,6 @@ export function showNothing() {
   preview.showMessage("Pick a file on the left, or ask Claude to create a <code>.tex</code> file in <code>latex/</code>.");
 }
 
-/** The title bar names the folder you're working in ("~/Documents/thesis"). */
-function showWorkspace() {
-  const dir = state.roots.latex;
-  if (!dir) return;
-  $("workspace-name").textContent = dir.replace(/^\/(?:Users|home)\/[^/]+/, "~");
-}
-
 /** "2 agent files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */
 function showAgentFoot() {
   const n = tree.agentFileCount;
@@ -148,24 +145,6 @@ export function toggleAgentFiles(visible: boolean) {
 }
 
 // ---------- acting on files ----------
-
-export async function exportPdf() {
-  const selected = state.selected;
-  if (!selected || selected.kind !== "doc" || !state.lastPdf) return toast("Open a document that compiles to save its PDF");
-  ui.exportButton.disabled = true;
-  try {
-    const request: ExportRequest = { doc: selected.path };
-    const res = await fetch(API.export, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
-    const body = (await res.json().catch(() => ({ error: "Export failed" }))) as ExportResponse;
-    toast("path" in body ? `Saved to ${body.path}` : body.error);
-  } finally {
-    ui.exportButton.disabled = !state.lastPdf;
-  }
-}
 
 /** Claude runs in latex/, so mention files relative to it (absolute for anything elsewhere). */
 export function mention(file: FileNode | null | undefined) {

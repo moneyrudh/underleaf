@@ -18,6 +18,7 @@ export async function seedWorkspace(latexDir: string, templatesDir: string) {
     // Read via a fresh handle: in Bun 1.4.2, writing to a Bun.file() you've called
     // .exists() on produces an empty file, so always write by path with explicit contents.
     const current = await Bun.file(dest).text().catch(() => null);
+    if (rel === ".underleaf/id") continue; // each workspace's own; never copied from a template
     const managed = rel.startsWith(".underleaf/");
     // An empty file counts as missing: it was never personalized (and repairs bad copies).
     if (managed ? current === template : current !== null && current.length > 0) continue;
