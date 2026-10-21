@@ -367,6 +367,18 @@ await check("saving after a change leaves a new marker", async () => {
   const saveMarkers = async () =>
     ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.filter((s) => s.label === "Saved as draft.pdf").length;
   await until(async () => (await saveMarkers()) === 2, 10_000, "a second save marker");
+});
+
+await check("won't save while the latest build has failed (the PDF would be older than the source)", async () => {
+  const writes = await js<number>("window.__save.writes");
+  const good = await Bun.file(main).text();
+  await Bun.write(main, good.replace("\\end{document}", "\\undefinedcommand\n\\end{document}"));
+  await waitFor("document.getElementById('status').dataset.state === 'fail' || /error/.test(document.getElementById('status').textContent)", "build failed", 20_000);
+  await press("s", [MOD]);
+  await waitFor("/build failed/.test(document.getElementById('toast').textContent)", "explains why it didn't save");
+  expect((await js<number>("window.__save.writes")) === writes, "saved anyway");
+  await Bun.write(main, good);
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "builds again", 20_000);
   // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
   await press("p", [MOD]);
   await waitFor("!document.getElementById('palette').hidden", "palette");

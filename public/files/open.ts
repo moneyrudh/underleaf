@@ -92,6 +92,7 @@ export function open(file: FileNode) {
     if (switching) loadSaveTarget();
     if (switching) {
       state.lastPdf = null;
+      state.build = "running";
       ui.exportButton.disabled = true;
       preview.setStatus("Building…", "busy");
       if (!preview.hasContent()) preview.showMessage("Compiling…"); // nothing to keep on screen meanwhile

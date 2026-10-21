@@ -48,6 +48,7 @@ function handle(msg: ServerMessage) {
   if (msg.type === "history") return void versions.refresh();
   const selected = state.selected;
   if (!selected || msg.doc !== selected.path) return;
+  state.build = msg.type === "compiling" ? "running" : msg.ok ? "ok" : "failed";
 
   // Comparing: a live side follows the build, and nothing else on screen changes.
   if (diffView.active) {

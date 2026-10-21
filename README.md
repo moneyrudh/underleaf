@@ -53,7 +53,7 @@ With no folder given, a fresh checkout uses its own `latex/` folder (git-ignored
 | **Save As…** (⌘⇧S) | Your system's save dialog. The file you choose becomes what ⌘S saves over. |
 | **Save to Downloads** | A plain download, a new file each time. |
 
-Each document remembers its own file. The save dialog needs Chrome or Edge; in other browsers, Save PDF and Save As download instead. Every save leaves a marker in the document's version history ("Saved as draft-3.pdf"), so you can always get back the exact version you sent.
+Each document remembers its own file. The save dialog needs Chrome or Edge; in other browsers, Save PDF and Save As download instead. Every save leaves a marker in the document's version history ("Saved as draft-3.pdf"), so you can always get back the exact version you sent. Saving waits for a good build: while the document is building, or if its latest build failed, the PDF on screen is older than your source, so Save says why instead of saving.
 
 ### The file tree
 

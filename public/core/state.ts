@@ -9,6 +9,8 @@ export const state = {
   historyEnabled: false,
   /** Latest good PDF of the open document. */
   lastPdf: null as string | null,
+  /** The open document's latest build: still running, or how it ended. Saving needs a finished, good one. */
+  build: "running" as "running" | "ok" | "failed",
   /** Tree root keys ("latex") → absolute folders. */
   roots: {} as Record<string, string>,
   /** The open workspace (folder), and the others opened recently. Set by the server's first message. */

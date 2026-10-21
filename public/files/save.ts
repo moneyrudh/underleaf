@@ -44,9 +44,15 @@ async function once(fn: () => Promise<void>) {
 const keyFor = (doc: string) => `save:${state.workspace?.id ?? ""}:${doc}`;
 const pdfName = () => `${state.selected!.name.replace(/\.tex$/, "")}.pdf`;
 
+/**
+ * Whether the open document can be saved now. Only a finished, successful build: otherwise the PDF on
+ * screen is an older one than the source, and the history marker would point at the wrong version.
+ */
 function ready(): boolean {
-  if (state.selected?.kind === "doc" && state.lastPdf) return true;
-  toast("Open a document that builds to save its PDF");
+  if (state.selected?.kind !== "doc" || !state.lastPdf) toast("Open a document that builds to save its PDF");
+  else if (state.build === "running") toast("Still building. Save again when it's done, so the PDF matches your source.");
+  else if (state.build === "failed") toast("The latest build failed, so the PDF is older than your source. Fix the errors (Logs, L), then save.");
+  else return true;
   return false;
 }
 
