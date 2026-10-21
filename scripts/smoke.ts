@@ -9,7 +9,7 @@
  */
 import os from "node:os";
 import path from "node:path";
-import { chmod, cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, rename, rm, stat } from "node:fs/promises";
 import { REPO } from "../src/repo";
 import { API, url } from "../shared/protocol";
 
@@ -375,6 +375,33 @@ await check("saving after a change leaves a new marker", async () => {
   await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
 });
 
+const openFolder = (dir: string) =>
+  fetch(`http://localhost:${port}${API.workspaceOpen}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir }) });
+
+await check("refuses folders inside underleaf's checkout, without writing to them", async () => {
+  const templates = path.join(REPO, "templates", "workspace");
+  const res = await openFolder(templates);
+  expect(res.status === 400, `templates/workspace: status ${res.status}`);
+  expect(!(await Bun.file(path.join(templates, ".underleaf", "id")).exists()), "an id was written into the template");
+});
+
+await check("a folder that can't be opened leaves the current workspace running", async () => {
+  const locked = path.join(tmp, "locked");
+  await mkdir(locked);
+  await Bun.write(path.join(locked, "x.tex"), "\\documentclass{article}\n\\begin{document}x\\end{document}\n");
+  await chmod(locked, 0o555);
+  try {
+    const res = await openFolder(locked);
+    const body = (await res.json()) as { error?: string };
+    expect(res.status === 400 && /can't write/.test(body.error ?? ""), `read-only folder: ${res.status} ${body.error}`);
+  } finally {
+    await chmod(locked, 0o755);
+  }
+  // The old workspace still watches its files: a new one shows up in the tree.
+  await Bun.write(path.join(latex, "after-refusal.md"), "still here\n");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'after-refusal.md')", "new file listed", 10_000);
+});
+
 await check("switching workspaces swaps the files, the title and Claude's folder", async () => {
   await js(`fetch("/api/workspace/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: ${JSON.stringify(other)} }) })`);
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'other.tex')", "the other workspace's files", 20_000);
@@ -389,6 +416,18 @@ await check("switching back from the title bar restores that workspace's history
   await js("[...document.querySelectorAll('.menu li')].find(li => li.querySelector('.label')?.textContent === 'latex').click()");
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'main.tex')", "back in the first workspace", 20_000);
   await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "its last open file (notes.md) reopened");
+});
+
+await check("a workspace folder that disappears isn't recreated", async () => {
+  const doomed = path.join(tmp, "doomed");
+  await mkdir(doomed);
+  await Bun.write(path.join(doomed, "d.tex"), "\\documentclass{article}\n\\begin{document}d\\end{document}\n");
+  expect((await openFolder(doomed)).status === 200, "couldn't open the folder");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'd.tex')", "its files", 20_000);
+  await rename(doomed, path.join(tmp, "doomed-moved")); // as if moved to the trash
+  await waitFor("![...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'd.tex')", "files gone from the tree", 10_000);
+  await Bun.sleep(1500); // past the 1 s health check (and the brief's debounce)
+  expect(!(await Bun.file(doomed).exists()) && !(await stat(doomed).catch(() => null)), "the folder was recreated");
 });
 
 await check("no errors in the page", async () => {

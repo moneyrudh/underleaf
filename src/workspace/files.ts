@@ -79,18 +79,20 @@ export async function resolveTreePath(roots: Record<string, string>, treePath: s
 }
 
 /**
- * Watch a directory recursively and keep it alive: if it's deleted or replaced
- * (fs.watch goes silent when that happens), recreate it and start watching again.
+ * Watch a directory recursively and keep watching it when it's replaced (fs.watch goes silent
+ * when that happens). If it's deleted: with `recreate`, make it again empty; without, wait for it
+ * to come back (moved back, restored from the trash) and report the change either way.
  */
-export function keepWatching(dir: string, onChange: (filename: string) => void): { ready: Promise<void>; stop: () => void } {
+export function keepWatching(dir: string, onChange: (filename: string) => void, recreate: boolean): { ready: Promise<void>; stop: () => void } {
   let watcher: FSWatcher | undefined;
   let inode: number | undefined;
   let stopped = false;
 
   const start = async () => {
-    await mkdir(dir, { recursive: true });
-    if (stopped) return;
-    inode = (await stat(dir)).ino;
+    if (recreate) await mkdir(dir, { recursive: true });
+    const info = await stat(dir).catch(() => null);
+    if (stopped || !info?.isDirectory()) return;
+    inode = info.ino;
     watcher?.close();
     watcher = watch(dir, { recursive: true }, (_event, filename) => onChange(filename ?? ""));
     watcher.on("error", () => {}); // the health check below takes over
@@ -99,6 +101,14 @@ export function keepWatching(dir: string, onChange: (filename: string) => void):
   const health = setInterval(async () => {
     const info = await stat(dir).catch(() => null);
     if (stopped || (info?.isDirectory() && info.ino === inode)) return;
+    if (!info?.isDirectory() && !recreate) {
+      if (inode === undefined) return; // still gone, already reported
+      inode = undefined;
+      watcher?.close();
+      watcher = undefined;
+      onChange("");
+      return;
+    }
     await start();
     onChange("");
   }, 1000);

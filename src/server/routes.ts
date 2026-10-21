@@ -1,8 +1,9 @@
+import type { Server } from "bun";
 import path from "node:path";
 import index from "../../public/index.html";
 import { REPO } from "../repo";
 import { PORT } from "./config";
-import { current, openWorkspace, unusable, workspaceMessage } from "./workspace";
+import { current, tryOpenWorkspace, workspaceMessage } from "./workspace";
 import { pickFolder } from "../workspace/pick";
 import { build, compiledMessage, goodPdfOf, isStale, relDoc, stateOf } from "../build/builds";
 import { appClients, broadcast, claude, HOOK_TOKEN, setLastOpened, type WsData } from "./clients";
@@ -187,25 +188,23 @@ export function startServer() {
         POST: async (req: Request) => {
           if (!trusted(req)) return forbidden();
           const { dir } = (await req.json().catch(() => ({}))) as Partial<OpenWorkspaceRequest>;
-          const target = typeof dir === "string" ? path.resolve(dir) : "";
-          const problem = target ? await unusable(target) : "Bad request";
+          const problem = typeof dir === "string" && dir ? await tryOpenWorkspace(path.resolve(dir)) : "Bad request";
           if (problem) return Response.json({ error: problem } satisfies OpenWorkspaceResponse, { status: 400 });
-          await openWorkspace(target);
           return Response.json({ ok: true } satisfies OpenWorkspaceResponse);
         },
       },
 
       [API.workspacePick]: {
-        POST: async (req: Request) => {
+        POST: async (req: Request, server: Server<WsData>) => {
           if (!trusted(req)) return forbidden();
+          server.timeout(req, 0); // the dialog stays open as long as you browse; Bun would cut the request at 10 s
           const choice = await pickFolder();
           if (choice === null) return Response.json({ cancelled: true } satisfies PickFolderResponse);
           if (choice === "unsupported") {
             return Response.json({ error: "No folder dialog on this system. Start underleaf with the folder instead: bun dev <folder>" } satisfies PickFolderResponse, { status: 501 });
           }
-          const problem = await unusable(choice);
+          const problem = await tryOpenWorkspace(choice);
           if (problem) return Response.json({ error: problem } satisfies PickFolderResponse, { status: 400 });
-          await openWorkspace(choice);
           return Response.json({ ok: true, dir: choice } satisfies PickFolderResponse);
         },
       },

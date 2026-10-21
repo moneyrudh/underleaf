@@ -11,9 +11,10 @@ const changed = new Set<string>();
 
 let watcher: { stop: () => void } | null = null;
 
-export async function startWatching(dir: string) {
+/** `recreate`: bring the folder back if it's deleted (only for the checkout's own latex/, never a folder you opened). */
+export async function startWatching(dir: string, recreate: boolean) {
   stopWatching();
-  const w = keepWatching(dir, (f) => onFsChange(f ? `latex/${f}` : "latex"));
+  const w = keepWatching(dir, (f) => onFsChange(f ? `latex/${f}` : "latex"), recreate);
   watcher = w;
   await w.ready;
 }

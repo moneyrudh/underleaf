@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import type { CompileResult } from "../build/compile";
 import type { DirNode, FileNode, TreeNode } from "../../shared/types";
 
@@ -78,6 +78,7 @@ export function renderBrief({ latex, results, compiling, open }: BriefInput): st
 
 let last = "";
 export async function writeBrief(latexDir: string, input: BriefInput) {
+  if (!(await stat(latexDir).catch(() => null))?.isDirectory()) return; // the folder is gone: don't recreate it
   const text = renderBrief(input);
   if (text === last) return;
   last = text;

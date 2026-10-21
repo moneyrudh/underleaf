@@ -2,7 +2,7 @@ import { ENGINES } from "../shared/types";
 import { DEFAULT_DIR, OPEN_BROWSER, START_DIR } from "./server/config";
 import { claude } from "./server/clients";
 import { flushEditSnapshot } from "./history/snapshots";
-import { openWorkspace, unusable } from "./server/workspace";
+import { canonical, openWorkspace, unusable } from "./server/workspace";
 import { startServer } from "./server/routes";
 import { recentWorkspaces } from "./workspace/registry";
 
@@ -24,8 +24,8 @@ if (!ENGINES.some((e) => Bun.which(e))) {
 }
 
 // The folder named on the command line, else the last one you had open, else this checkout's latex/.
-const startDir = START_DIR ?? (await recentWorkspaces())[0] ?? DEFAULT_DIR;
-const problem = startDir === DEFAULT_DIR ? null : await unusable(startDir);
+const startDir = await canonical(START_DIR ?? (await recentWorkspaces())[0] ?? DEFAULT_DIR);
+const problem = startDir === (await canonical(DEFAULT_DIR)) ? null : await unusable(startDir);
 if (problem) {
   console.error(problem);
   process.exit(1);
