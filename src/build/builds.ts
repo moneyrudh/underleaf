@@ -1,5 +1,5 @@
 import path from "node:path";
-import { copyFile } from "node:fs/promises";
+import { copyFile, rename } from "node:fs/promises";
 import { compile, type CompileResult } from "./compile";
 import { current, generation } from "../server/workspace";
 import { send } from "../server/clients";
@@ -60,7 +60,11 @@ export async function build(doc: string) {
       const result = await compile(path.join(current().dir, relDoc(doc)), outDirOf(doc));
       if (gen !== generation) return; // the workspace changed meanwhile: this build belongs to the old one
       if (result.ok) {
-        await copyFile(result.pdfPath, goodPdfOf(doc));
+        // Copy beside it, then rename over it (atomic): a page fetching the PDF mid-copy gets the old
+        // one or the new one, never a truncated file it might save somewhere.
+        const good = goodPdfOf(doc);
+        await copyFile(result.pdfPath, `${good}.tmp`);
+        await rename(`${good}.tmp`, good);
         s.version++;
       }
       s.last = result;
