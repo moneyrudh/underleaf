@@ -418,6 +418,17 @@ await check("switching back from the title bar restores that workspace's history
   await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "its last open file (notes.md) reopened");
 });
 
+await check("a copied folder gets its own id and history, starting from the original's", async () => {
+  const copy = path.join(tmp, "latex-copy");
+  await cp(latex, copy, { recursive: true }); // like Finder's Duplicate: .underleaf/id comes along
+  expect((await openFolder(copy)).status === 200, "couldn't open the copy");
+  await waitFor("document.querySelector('#workspace-btn .ws-name')?.textContent === 'latex-copy'", "title bar names the copy", 20_000);
+  const idOf = async (dir: string) => (await Bun.file(path.join(dir, ".underleaf", "id")).text()).trim();
+  expect((await idOf(copy)) !== (await idOf(latex)), "the copy kept the original's id");
+  const labels = ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.map((s) => s.label);
+  expect(labels.includes("Claude: Tighten the bullets"), `the copy's history doesn't start from the original's: ${labels.join(" | ")}`);
+});
+
 await check("a workspace folder that disappears isn't recreated", async () => {
   const doomed = path.join(tmp, "doomed");
   await mkdir(doomed);

@@ -7,11 +7,11 @@ import { HOME } from "../home";
 import { broadcast, claude } from "./clients";
 import { resetBuilds } from "../build/builds";
 import { closeHistory, flushEditSnapshot, openHistory } from "../history/snapshots";
-import { workspaceId } from "../history/store";
+import { forkWorkspaceId, workspaceId } from "../history/store";
 import { docs, rescan, scheduleBrief, treeMessage } from "./trees";
 import { startWatching, stopWatching } from "./watch";
 import { ensureClaudeHooks, seedWorkspace } from "../workspace/seed";
-import { recentWorkspaces, rememberWorkspace } from "../workspace/registry";
+import { copiedFrom, recentWorkspaces, rememberWorkspace } from "../workspace/registry";
 import { build } from "../build/builds";
 import type { WorkspaceMessage } from "../../shared/protocol";
 
@@ -77,7 +77,13 @@ async function open(dir: string) {
   const isDefault = dir === (await canonical(DEFAULT_DIR));
   if (isDefault) await seedWorkspace(dir, path.join(REPO, "templates"));
   if (Bun.which("git")) await ensureClaudeHooks(dir, `http://127.0.0.1:${PORT}`);
-  const id = await workspaceId(dir);
+  let id = await workspaceId(dir);
+  // A copy would otherwise share the original's history, build folder and the page's saved state.
+  const original = await copiedFrom(dir, id);
+  if (original) {
+    id = await forkWorkspaceId(dir, id);
+    console.log(`${dir} is a copy of ${original}: it now has its own history, starting from the original's`);
+  }
 
   const previous = active;
   if (previous) {

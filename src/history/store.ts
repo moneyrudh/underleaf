@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir } from "node:fs/promises";
+import { cp, mkdir, rm, stat } from "node:fs/promises";
 import type { Snapshot, SnapshotAuthor, SnapshotKind } from "../../shared/types";
 import { HOME } from "../home";
 
@@ -187,6 +187,22 @@ export async function workspaceId(workDir: string): Promise<string> {
   const existing = (await file.text().catch(() => "")).trim();
   if (/^[\w-]{8,}$/.test(existing)) return existing;
   const id = crypto.randomUUID();
+  await Bun.write(path.join(workDir, ".underleaf", "id"), id + "\n");
+  return id;
+}
+
+/**
+ * Give a copied workspace (same id as the folder it was copied from) an id of its own. Its history
+ * starts as a copy of the original's, so past versions stay, and from here the two are separate.
+ */
+export async function forkWorkspaceId(workDir: string, fromId: string): Promise<string> {
+  const id = crypto.randomUUID();
+  const from = path.join(HOME, "history", `${fromId}.git`);
+  const to = path.join(HOME, "history", `${id}.git`);
+  if ((await stat(from).catch(() => null))?.isDirectory()) {
+    await cp(from, to, { recursive: true });
+    await rm(path.join(to, "index.lock"), { force: true }); // in case the original was mid-snapshot
+  }
   await Bun.write(path.join(workDir, ".underleaf", "id"), id + "\n");
   return id;
 }
