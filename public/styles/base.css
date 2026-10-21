@@ -58,6 +58,8 @@ button, .button {
   font-size: 12.5px;
 }
 .primary:hover { background: var(--leaf-strong); }
+.primary.saved { animation: saved 0.7s ease-out; }
+@keyframes saved { from { box-shadow: 0 0 0 0 var(--leaf); } to { box-shadow: 0 0 0 7px transparent; } }
 .primary:disabled { opacity: 0.45; cursor: default; background: var(--leaf); }
 
 /* Split button: Save PDF ▾ */

@@ -1,7 +1,7 @@
 import { API, type SavedRequest } from "../../shared/protocol";
 import { idbGet, idbSet } from "../core/idb";
 import { state, ui } from "../core/state";
-import { $, toast } from "../core/util";
+import { $, replay, toast } from "../core/util";
 
 /**
  * Saving a document's PDF where you want it.
@@ -108,6 +108,7 @@ async function download() {
   a.href = `${state.lastPdf}&download`;
   a.click();
   toast(`Downloading ${pdfName()}`);
+  replay(ui.exportButton, "saved");
   void mark("downloaded", pdfName());
 }
 
@@ -118,6 +119,7 @@ async function write(handle: Handle) {
   await out.write(pdf);
   await out.close();
   toast(`Saved ${handle.name}`);
+  replay(ui.exportButton, "saved"); // every save shows, even one that adds no version (nothing changed)
   void mark("saved", handle.name, doc);
 }
 

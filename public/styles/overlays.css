@@ -150,6 +150,8 @@
   box-shadow: var(--shadow-pop);
   font-size: 13px;
 }
+.toast.pop { animation: toast-pop 0.22s ease-out; }
+@keyframes toast-pop { from { opacity: 0; transform: translate(-50%, 6px) scale(0.97); } }
 
 .leader {
   position: fixed;

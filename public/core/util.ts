@@ -43,8 +43,16 @@ export function toast(text: string) {
   const el = $("toast");
   el.textContent = text;
   el.hidden = false;
+  replay(el, "pop"); // a repeat of the same message still visibly lands
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 3000);
+}
+
+/** Restart a one-shot CSS animation class, even if it's still running. */
+export function replay(el: HTMLElement, cls: string) {
+  el.classList.remove(cls);
+  void el.offsetWidth; // reflow, so re-adding the class starts the animation over
+  el.classList.add(cls);
 }
 
 export function formatBytes(n: number) {
