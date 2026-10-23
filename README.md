@@ -4,6 +4,12 @@ A local LaTeX workspace with the Overleaf experience, and with Claude Code built
 
 Everything runs on your machine. No account, no compile timeouts, and your documents never leave your computer.
 
+The app will be available to download cross-platform soon.
+
+## Visual
+
+<img width="1710" height="980" alt="Screenshot 2026-10-23 at 11 01 38 AM" src="https://github.com/user-attachments/assets/7adf8aad-fdfa-4bd7-968e-96402502a53b" />
+
 ## Setup
 
 You need [bun](https://bun.sh) and a TeX distribution. For the Claude pane, you also need [Claude Code](https://claude.com/claude-code), installed and logged in.
