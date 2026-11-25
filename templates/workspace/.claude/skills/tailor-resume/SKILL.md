@@ -1,20 +1,20 @@
 ---
 name: tailor-resume
 description: Tailor a resume to a specific job. Use when the user shares a job description or posting link, names a company/role they're applying to, or asks to adapt, target, or customize their resume.
-argument-hint: "[job URL, or paste the description]"
+argument-hint: "[paste the job description]"
 ---
 
 # Tailor a resume to a job
 
 ## 1. Get the job description
 
-- If you have a link, fetch it. If the page is blocked or empty, ask the user to paste the text.
+- You can't open web pages here. If the user gives a link, ask them to paste the posting's text (and keep the link for `jd.md`).
 - Pull out the company, role title, and level. Ask only if they're genuinely unclear.
 
 ## 2. Set up the folder
 
 - Folder: `<company>-<role>/` in lowercase kebab-case (e.g. `ramp-frontend-engineer/`). If it exists, ask whether to update it or start a new one.
-- Save the job description as `<folder>/jd.md`, with the source URL and today's date at the top.
+- Save the job description as `<folder>/jd.md`, with the source link (if they gave one) and today's date at the top.
 - Base resume: the one the user names, otherwise `master.tex` if it exists, otherwise the most recently edited document. Say which one you picked. Copy it to `<folder>/resume.tex`. Never edit the base.
 
 ## 3. Analyze before writing

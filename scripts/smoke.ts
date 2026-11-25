@@ -202,6 +202,34 @@ await check("a shortcut closes an open menu, and keys work right after", async (
   await waitFor("document.getElementById('zoom-label').textContent === 'Fit'", "= back to Fit");
 });
 
+await check("the workspace's Claude settings carry underleaf's guardrails and hooks", async () => {
+  const { GUARDRAILS } = await import("../src/workspace/guardrails");
+  const settings = await Bun.file(path.join(latex, ".claude", "settings.json")).json();
+  for (const kind of ["deny", "ask"] as const) {
+    const missing = GUARDRAILS[kind].filter((r) => !settings.permissions?.[kind]?.includes(r));
+    expect(missing.length === 0, `${kind} rules missing: ${missing.join(", ")}`);
+  }
+  expect(settings.permissions?.blockWritesOutsideWorkingDirectories === true, "writes outside the workspace aren't blocked");
+  expect(JSON.stringify(settings.hooks ?? {}).includes("event=stop"), "Stop hook missing");
+});
+
+await check("guardrails merge: the user's own rules stay, rules underleaf dropped go, repeat runs change nothing", async () => {
+  const { ensureClaudeSettings } = await import("../src/workspace/seed");
+  const { GUARDRAILS } = await import("../src/workspace/guardrails");
+  const dir = path.join(tmp, "settings-merge");
+  await Bun.write(path.join(dir, ".claude", "settings.json"), JSON.stringify({ permissions: { deny: ["Bash(npm publish *)", "Bash(old-rule *)"], allow: ["Read"] }, model: "opus" }));
+  await Bun.write(path.join(dir, ".underleaf", "managed-settings.json"), JSON.stringify({ deny: ["Bash(old-rule *)"], ask: [] }));
+  await ensureClaudeSettings(dir, null);
+  const first = await Bun.file(path.join(dir, ".claude", "settings.json")).text();
+  const s = JSON.parse(first);
+  expect(s.permissions.deny.includes("Bash(npm publish *)") && s.permissions.allow.includes("Read") && s.model === "opus", "the user's own settings were changed");
+  expect(!s.permissions.deny.includes("Bash(old-rule *)"), "a rule underleaf no longer ships was kept");
+  expect(GUARDRAILS.deny.every((r) => s.permissions.deny.filter((x: string) => x === r).length === 1), "guardrails missing or duplicated");
+  expect(!s.hooks, "hooks written without history");
+  await ensureClaudeSettings(dir, null);
+  expect((await Bun.file(path.join(dir, ".claude", "settings.json")).text()) === first, "a second run changed the file");
+});
+
 await check("agent files: hidden by default, one click shows them", async () => {
   await waitFor("/\\d+ agent files hidden/.test(document.getElementById('tree-foot').textContent)", "the hidden-files line");
   await click("#agent-toggle");
