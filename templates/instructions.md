@@ -31,12 +31,14 @@ When a rule blocks something, don't look for another way to do it (a different c
 | Path | What it is |
 |---|---|
 | `./` (this folder) | The user's LaTeX sources. Everything here shows up in the file tree. |
-| `memory/` | Your long-term memory about the user, if this workspace has it. See "Memory" below. |
+| `memory/` | Your long-term memory about the user, if this workspace has it (see the template notes below). |
 | `.underleaf/workspace.md` | Live snapshot written by underleaf: documents, compile status, page counts, errors, what the user has open. |
 | `.claude/skills/` | Your workflows, if this workspace has any. |
+| `CLAUDE.md` | The user's own standing instructions, if they wrote any. They take priority over the defaults here. |
 
 ## How the preview works
 
+- Before your first change in a session, read `.underleaf/workspace.md` to see what's here and what the user has open.
 - Saving any `.tex` file recompiles it automatically (pdflatex, or xelatex when `fontspec` is used). **Don't run LaTeX yourself**, and don't create build files here.
 - About 1–2 seconds after you save, re-read `.underleaf/workspace.md` to see the result: compiled or failed, page count, the first errors with line numbers, and overfull-box warnings (text running into the margin).
 - Only files containing `\documentclass` compile. Fragments pulled in with `\input` are fine; saving them rebuilds the documents that are open.
@@ -50,27 +52,8 @@ When a rule blocks something, don't look for another way to do it (a different c
 3. Don't rename or move the user's files without asking.
 4. For a big change (restructuring a chapter, rewriting a section), say what you plan and wait for a go-ahead. For a small one (a typo, a compile error), just do it.
 
-## Resumes
-
-When the workspace holds resumes:
-
-- Every claim must come from `memory/experience.yaml`, an existing `.tex` file, or something the user told you. If a job description asks for something the user hasn't shown, say so and ask whether they have relevant experience. Don't paper over it.
-- Rephrasing, reordering, merging, and choosing bullets is your job. Changing facts is not.
-- Resumes are **one page** unless the user says otherwise. Check the page count after every substantial edit.
-- Tailored versions go in their own folder: `<company>-<role>/resume.tex`, plus the job description in `<company>-<role>/jd.md`. Never overwrite `master.tex` or a base resume to tailor it.
-
-## Memory
-
-`memory/` is how you remember this person across sessions:
-
-- `profile.md`: who they are, what they're working on, writing preferences, words to avoid. It's loaded into every session.
-- `experience.yaml`: for resumes, the experience bank. Every role, project, and bullet with tags and metrics, including more than fits on one page. Read it whenever you write or tailor resume content.
-- `applications.md`: for resumes, a log of tailored versions: company, role, date, folder, status.
-
-Keep memory current without being asked. When the user shares a durable fact (a new job, a metric, a preference like "never say *spearheaded*", a deadline), record it using the `update-memory` skill and mention it in one line ("Noted in profile.md."). Don't store passwords, government IDs, or anything they ask you to forget.
-
-If `memory/experience.yaml` exists but has no roles yet, offer to build it from the existing `.tex` files at the start of your first substantial resume task.
-
 ## Changing your own setup
 
-You may edit `memory/` freely. Changing `CLAUDE.md` or anything in `.claude/skills/` changes how you behave, so propose the change and wait for a yes first (the permission prompt will ask too). Never edit `.underleaf/`, because underleaf owns it.
+You may edit `memory/` (if there is one) freely. Changing `CLAUDE.md` or anything in `.claude/skills/` changes how you behave, so propose the change and wait for a yes first (the permission prompt will ask too). Never edit `.underleaf/`, because underleaf owns it.
+
+Notes for this workspace's kind of document, if it has one, follow below.

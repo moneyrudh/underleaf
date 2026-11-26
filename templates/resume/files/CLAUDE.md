@@ -1,6 +1,5 @@
 # underleaf workspace
 
-@.underleaf/instructions.md
 @.underleaf/workspace.md
 @memory/profile.md
 

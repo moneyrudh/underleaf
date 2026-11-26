@@ -38,6 +38,7 @@ If `doctor` can't find LaTeX:
 bun dev                       # opens http://localhost:4747 on the folder you had open last
 bun dev ~/Documents/thesis    # opens a specific folder
 bun dev examples              # try the bundled example
+bun run new ~/thesis --template thesis   # start a folder from a template
 bun run pdf latex/main.tex    # one-off export from the terminal
 ```
 
@@ -49,7 +50,9 @@ A workspace is one folder of documents: a thesis, a set of resumes, a paper. Eac
 
 The folder name in the title bar switches between workspaces you've opened, and **Open folder…** opens another one with your system's folder dialog (also in the command palette, along with **Switch workspace…**). Switching swaps the file tree, the history and Claude's folder; Claude picks up that folder's last conversation. underleaf adds two small things to a folder you open: `.underleaf/` (the history id and a status file for Claude) and, in `.claude/settings.json`, its hooks and the permission rules described under [Security](#security).
 
-With no folder given, a fresh checkout uses its own `latex/` folder (git-ignored, so personal files never end up in this repo) and gives it the starter resume setup: a `resume.tex` from `templates/resume.tex` plus the agent files below. Folders you open don't get those added.
+With no folder given, a fresh checkout uses its own `latex/` folder, which is git-ignored so personal files never end up in this repo.
+
+A folder with no `.tex` files opens on a template picker: **Resume**, **Thesis**, **Article**, or **Blank**. `bun run new <folder> --template <name>` does the same from the terminal. A template only fills an empty folder and never overwrites a file that's already there.
 
 ### Saving PDFs
 
@@ -78,24 +81,32 @@ Hidden files (dotfiles) and symlinks are left out of the tree.
 
 ### The Claude pane
 
-It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. When underleaf starts, Claude picks up your most recent conversation in `latex/` (`claude --continue`). The command palette has **new conversation** and **resume a previous conversation…** (Claude's own session picker). If Claude exits, press Enter to pick up where you left off. Toggle the pane with **Claude** in the top bar.
+It runs your own installed `claude` with your own login, in a real terminal (xterm.js on top of a PTY), so you get the full Claude Code UI: permission prompts, slash commands, and everything else. The session lives in the server process, so reloading the page reconnects you to the same session. When underleaf starts, Claude picks up your most recent conversation in the workspace (`claude --continue`). The command palette has **new conversation** and **resume a previous conversation…** (Claude's own session picker). If Claude exits, press Enter to pick up where you left off. Toggle the pane with **Claude** in the top bar.
 
-#### The resume agent
+#### Claude's setup in a workspace
 
-On startup, underleaf sets up `latex/` as a workspace for a resume-focused agent:
+Claude is set up as a writing assistant for the workspace's documents: their text, LaTeX, figures, data, and bibliography. It declines other tasks, and permission rules back that up (see [Security](#security)).
 
 | Path | Owner | Purpose |
 |---|---|---|
-| `CLAUDE.md` | you | Imports the files below. Add your own standing instructions here. |
-| `.underleaf/instructions.md` | underleaf | The agent's role and ground rules (never invent facts, one page, tailored versions in their own folder…). Refreshed on update. |
+| `.underleaf/instructions.md` | underleaf | Claude's role and ground rules (never invent facts or citations, don't delete or rename without asking…), plus notes for the workspace's kind of document. Rewritten on every start, so it follows underleaf updates. |
 | `.underleaf/workspace.md` | underleaf | Live snapshot: every document's compile status, page count, errors, and what's open. Claude re-reads it after edits. |
-| `memory/profile.md`, `memory/experience.yaml`, `memory/applications.md` | Claude & you | Long-term memory: who you are, a structured bank of every role and bullet, and a log of tailored applications. |
-| `.claude/skills/` | Claude & you | `tailor-resume`, `fit-one-page`, `update-memory`. Claude uses them automatically, or you can type `/tailor-resume`. |
-| `.claude/settings.json` | you | Accepts file edits without prompting, and turns off Claude Code's built-in auto memory so `memory/` is the single source. underleaf merges in its hooks and permission rules on every start and leaves the rest alone. |
+| `CLAUDE.md` | you | Your own standing instructions ("British spelling", "the venue's limit is 8 pages"). They take priority over underleaf's. |
+| `.claude/skills/` | Claude & you | Workflows from the template. Claude uses them when they fit, or type `/<name>`. |
+| `.claude/settings.json` | you | Accepts file edits without prompting. underleaf merges in its hooks and permission rules on every start and leaves the rest alone. |
 
-Files marked "you" or "Claude & you" are copied in only when missing, so your changes are never overwritten. Everything lives in the git-ignored `latex/`, so it stays private. For history, run `git init` inside `latex/`.
+What each template adds:
 
-On first use, ask Claude to build your experience bank from your existing resumes.
+| Template | Files | Skills |
+|---|---|---|
+| **Resume** | `resume.tex`; `memory/` with your profile, an experience bank of every role and bullet, and a log of applications | `tailor-resume`, `fit-one-page`, `update-memory` |
+| **Thesis** | `main.tex` with one file per chapter in `chapters/`, `references.bib`, `notes/terminology.md` | `check-citations`, `consistent-terminology` |
+| **Article** | `main.tex` with an abstract, `references.bib` | `check-citations` |
+| **Blank** | `main.tex` | none |
+
+underleaf hands Claude its instructions when it starts Claude in the folder, so nothing is added to your `CLAUDE.md`. Templates live in `templates/` (one folder each, plus `templates/instructions.md` for the part every workspace gets).
+
+For a resume workspace, ask Claude on first use to build your experience bank from your existing resumes.
 
 `CLAUDE.md` and `memory/` are hidden from the file tree by default. Run **Show agent memory** from the command palette (⌘⇧P) to see or edit what Claude remembers.
 

@@ -3,6 +3,7 @@ import { copyFile } from "node:fs/promises";
 import { compile } from "./build/compile";
 import { ENGINES } from "../shared/types";
 import { REPO } from "./repo";
+import { applyTemplate, isEmptyWorkspace, listTemplates } from "./workspace/templates";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -13,12 +14,35 @@ switch (command) {
   case "doctor":
     doctor();
     break;
+  case "new":
+    await create(rest);
+    break;
   default:
     console.log(`usage:
   bun dev [folder]                     open the app on a folder (default: the last one you had open)
+  bun run new <folder> [--template t]  start a workspace from a template (resume, thesis, article, blank)
   bun run pdf <file.tex> [out.pdf]     compile once and write the PDF
   bun run doctor                       check your LaTeX install`);
     process.exit(command ? 1 : 0);
+}
+
+/** `new <folder> [--template name]`: make a folder (or fill an empty one) from a template. */
+async function create(args: string[]) {
+  const i = args.indexOf("--template");
+  const name = i >= 0 ? args[i + 1] : "blank";
+  const folder = args.find((a, j) => !a.startsWith("--") && j !== i + 1);
+  const names = (await listTemplates()).map((t) => t.name);
+  if (!folder || !name || !names.includes(name)) {
+    console.error(`usage: bun run new <folder> [--template ${names.join("|")}]`);
+    process.exit(1);
+  }
+  const dir = path.resolve(folder);
+  if (!(await isEmptyWorkspace(dir).catch(() => true))) {
+    console.error(`${dir} already has .tex files. Templates only fill an empty folder; open it with: bun dev ${folder}`);
+    process.exit(1);
+  }
+  const open = await applyTemplate(dir, name);
+  console.log(`✓ ${name} template in ${dir} (start with ${open})\n  open it: bun dev ${folder}`);
 }
 
 /** One-shot export: compile and copy the PDF next to where you ran the command. */

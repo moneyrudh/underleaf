@@ -11,6 +11,7 @@ import { $, escapeHtml, formatBytes, STORED, storage, toast } from "../core/util
 import type { DirNode, FileNode } from "../../shared/types";
 import { API, url } from "../../shared/protocol";
 import { loadSaveTarget, savePdf } from "./save";
+import { showTemplates } from "./templates";
 
 /** Opening files, keeping the preview in step with the file tree, and acting on files. */
 
@@ -126,7 +127,8 @@ export function showNothing() {
   hideDocumentActions();
   preview.showLogsButton(false);
   preview.setStatus("");
-  preview.showMessage("Pick a file on the left, or ask Claude to create a <code>.tex</code> file in <code>latex/</code>.");
+  if (!tree.hasTex()) return void showTemplates();
+  preview.showMessage("Pick a file on the left, or ask Claude to create a <code>.tex</code> file here.");
 }
 
 /** "2 agent files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */

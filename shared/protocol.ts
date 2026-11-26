@@ -1,4 +1,4 @@
-import type { ClaudeStart, Diagnostic, DirNode, Engine, Snapshot } from "./types";
+import type { ClaudeStart, Diagnostic, DirNode, Engine, Snapshot, TemplateInfo } from "./types";
 
 /**
  * Everything the server and the page say to each other: URLs, websocket messages, and
@@ -18,6 +18,10 @@ export const API = {
   workspaceOpen: "/api/workspace/open",
   /** POST → PickFolderResponse — show the system's folder dialog (on the machine running underleaf) and open the choice. */
   workspacePick: "/api/workspace/pick",
+  /** GET → TemplatesResponse — the templates, and whether this workspace can start from one. */
+  templates: "/api/templates",
+  /** POST StartTemplateRequest → StartTemplateResponse — fill an empty workspace from a template. */
+  templateStart: "/api/templates/start",
   /** GET ?path= → HistoryResponse — a file's versions, newest first. */
   history: "/api/history",
   /** GET ?commit=&path= — a file as it was at a snapshot. */
@@ -87,6 +91,12 @@ export type SavedResponse = { ok: true } | { error: string };
 export type OpenWorkspaceRequest = { dir: string };
 export type OpenWorkspaceResponse = { ok: true } | { error: string };
 export type PickFolderResponse = { ok: true; dir: string } | { cancelled: true } | { error: string };
+
+/** `canStart`: the workspace has no .tex files yet, so a template can fill it. */
+export type TemplatesResponse = { templates: TemplateInfo[]; canStart: boolean };
+export type StartTemplateRequest = { name: string };
+/** `open`: the tree path of the document to open first ("latex/main.tex"). */
+export type StartTemplateResponse = { ok: true; open: string } | { error: string };
 
 export type HistoryResponse = { enabled: boolean; snapshots: Snapshot[] };
 export type HistoryPdfError = { error: string; diagnostics: Diagnostic[] };

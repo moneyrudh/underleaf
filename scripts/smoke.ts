@@ -43,13 +43,14 @@ await Bun.write(path.join(latex, "CLAUDE.md"), "# Claude\n");
 await Bun.write(path.join(latex, "memory", "profile.md"), "# Profile\n");
 await Bun.write(path.join(other, "other.tex"), "\\documentclass{article}\n\\begin{document}\nThe other workspace.\n\\end{document}\n");
 const main = path.join(latex, "main.tex");
-await cp(path.join(REPO, "templates", "resume.tex"), main);
+await cp(path.join(REPO, "templates", "resume", "files", "resume.tex"), main);
 await Bun.write(path.join(latex, "notes.md"), "# notes\n\n- first\n");
 
 // A stand-in for the Claude Code CLI: notes the hook token it was given, prints a line, then echoes input.
 const fakeClaude = path.join(tmp, "fake-claude");
 const tokenFile = path.join(tmp, "hook-token");
-await Bun.write(fakeClaude, `#!/bin/sh\nprintf '%s' "$UNDERLEAF_HOOK_TOKEN" > '${tokenFile}'\necho "fake claude ready in $(basename "$PWD")"\nexec cat\n`);
+const argsFile = path.join(tmp, "claude-args"); // the arguments of the latest start
+await Bun.write(fakeClaude, `#!/bin/sh\nprintf '%s' "$UNDERLEAF_HOOK_TOKEN" > '${tokenFile}'\nprintf '%s\\n' "$@" > '${argsFile}'\necho "fake claude ready in $(basename "$PWD")"\nexec cat\n`);
 await chmod(fakeClaude, 0o755);
 
 // History with a few versions: init → two edits. history.ts reads UNDERLEAF_HOME when it's
@@ -214,7 +215,7 @@ await check("the workspace's Claude settings carry underleaf's guardrails and ho
 });
 
 await check("guardrails merge: the user's own rules stay, rules underleaf dropped go, repeat runs change nothing", async () => {
-  const { ensureClaudeSettings } = await import("../src/workspace/seed");
+  const { ensureClaudeSettings } = await import("../src/workspace/claude-settings");
   const { GUARDRAILS } = await import("../src/workspace/guardrails");
   const dir = path.join(tmp, "settings-merge");
   await Bun.write(path.join(dir, ".claude", "settings.json"), JSON.stringify({ permissions: { deny: ["Bash(npm publish *)", "Bash(old-rule *)"], allow: ["Read"] }, model: "opus" }));
@@ -419,9 +420,9 @@ const openFolder = (dir: string) =>
   fetch(`http://localhost:${port}${API.workspaceOpen}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir }) });
 
 await check("refuses folders inside underleaf's checkout, without writing to them", async () => {
-  const templates = path.join(REPO, "templates", "workspace");
+  const templates = path.join(REPO, "templates", "resume", "files");
   const res = await openFolder(templates);
-  expect(res.status === 400, `templates/workspace: status ${res.status}`);
+  expect(res.status === 400, `templates/resume/files: status ${res.status}`);
   expect(!(await Bun.file(path.join(templates, ".underleaf", "id")).exists()), "an id was written into the template");
 });
 
@@ -467,6 +468,35 @@ await check("a copied folder gets its own id and history, starting from the orig
   expect((await idOf(copy)) !== (await idOf(latex)), "the copy kept the original's id");
   const labels = ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.map((s) => s.label);
   expect(labels.includes("Claude: Tighten the bullets"), `the copy's history doesn't start from the original's: ${labels.join(" | ")}`);
+});
+
+await check("an empty folder offers the templates; starting one fills it and gives Claude its instructions", async () => {
+  const fresh = path.join(tmp, "fresh");
+  await mkdir(fresh);
+  await Bun.write(path.join(fresh, "notes.txt"), "keep me\n"); // something that isn't LaTeX: still counts as empty
+  expect((await openFolder(fresh)).status === 200, "couldn't open the folder");
+  await waitFor("document.querySelectorAll('.template-card').length === 4", "four template cards", 20_000);
+  await click(".template-card[data-template='thesis']");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex open and built", 30_000);
+  for (const f of ["chapters/introduction.tex", "references.bib", ".claude/skills/check-citations/SKILL.md", ".claude/skills/consistent-terminology/SKILL.md"]) {
+    expect(await Bun.file(path.join(fresh, f)).exists(), `${f} wasn't copied`);
+  }
+  expect((await Bun.file(path.join(fresh, "notes.txt")).text()) === "keep me\n", "an existing file was touched");
+  const settings = await Bun.file(path.join(fresh, ".claude", "settings.json")).json();
+  expect(settings.permissions?.defaultMode === "acceptEdits" && settings.permissions?.deny?.includes("WebFetch"), "template settings and guardrails weren't both kept");
+  expect((await Bun.file(path.join(fresh, ".underleaf", "instructions.md")).text()).includes("This workspace: a thesis"), "instructions lack the thesis notes");
+  await until(async () => (await Bun.file(argsFile).text().catch(() => "")).includes("--append-system-prompt-file"), 10_000, "Claude restarted with the instructions");
+  const again = await fetch(`http://localhost:${port}${API.templateStart}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "article" }) });
+  expect(again.status === 409, `a second template over existing .tex files: status ${again.status}`);
+});
+
+await check("a resume workspace from before templates keeps its CLAUDE.md import, without a second copy", async () => {
+  const { claudeMdImportsInstructions, templateOf } = await import("../src/workspace/templates");
+  const old = path.join(tmp, "old-resume");
+  await Bun.write(path.join(old, "CLAUDE.md"), "# underleaf workspace\n\n@.underleaf/instructions.md\n@memory/profile.md\n");
+  await Bun.write(path.join(old, ".claude", "skills", "tailor-resume", "SKILL.md"), "---\nname: tailor-resume\n---\n");
+  expect((await templateOf(old)) === "resume", "not recognized as a resume workspace");
+  expect(await claudeMdImportsInstructions(old), "the import wasn't recognized (Claude would get the instructions twice)");
 });
 
 await check("a workspace folder that disappears isn't recreated", async () => {

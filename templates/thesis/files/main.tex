@@ -1,0 +1,37 @@
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+
+\title{Thesis Title}
+\author{Your Name}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+One paragraph: the problem, what you did, what you found, and why it matters.
+\end{abstract}
+
+\tableofcontents
+
+% Each chapter lives in its own file. Edit those; this file only puts them together.
+\include{chapters/introduction}
+\include{chapters/background}
+\include{chapters/conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

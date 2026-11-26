@@ -3,7 +3,8 @@ import path from "node:path";
 import index from "../../public/index.html";
 import { REPO } from "../repo";
 import { PORT } from "./config";
-import { current, tryOpenWorkspace, workspaceMessage } from "./workspace";
+import { current, startFromTemplate, tryOpenWorkspace, workspaceMessage } from "./workspace";
+import { isEmptyWorkspace, listTemplates } from "../workspace/templates";
 import { pickFolder } from "../workspace/pick";
 import { build, compiledMessage, goodPdfOf, isStale, relDoc, stateOf } from "../build/builds";
 import { appClients, broadcast, claude, HOOK_TOKEN, setLastOpened, type WsData } from "./clients";
@@ -20,6 +21,9 @@ import {
   type OpenWorkspaceRequest,
   type OpenWorkspaceResponse,
   type PickFolderResponse,
+  type StartTemplateRequest,
+  type StartTemplateResponse,
+  type TemplatesResponse,
   type SavedRequest,
   type SavedResponse,
   type HistoryPdfError,
@@ -191,6 +195,24 @@ export function startServer() {
           const problem = typeof dir === "string" && dir ? await tryOpenWorkspace(path.resolve(dir)) : "Bad request";
           if (problem) return Response.json({ error: problem } satisfies OpenWorkspaceResponse, { status: 400 });
           return Response.json({ ok: true } satisfies OpenWorkspaceResponse);
+        },
+      },
+
+      [API.templates]: async (req: Request) => {
+        if (!trusted(req)) return forbidden();
+        return Response.json({ templates: await listTemplates(), canStart: await isEmptyWorkspace(current().dir).catch(() => false) } satisfies TemplatesResponse);
+      },
+
+      [API.templateStart]: {
+        POST: async (req: Request) => {
+          if (!trusted(req)) return forbidden();
+          const { name } = (await req.json().catch(() => ({}))) as Partial<StartTemplateRequest>;
+          if (typeof name !== "string") return Response.json({ error: "Bad request" } satisfies StartTemplateResponse, { status: 400 });
+          try {
+            return Response.json({ ok: true, open: await startFromTemplate(name) } satisfies StartTemplateResponse);
+          } catch (e) {
+            return Response.json({ error: (e as Error).message } satisfies StartTemplateResponse, { status: 409 });
+          }
         },
       },
 

@@ -1,0 +1,6 @@
+{
+  "title": "Thesis",
+  "description": "A report with chapters in separate files, a bibliography, and skills for checking citations and terminology.",
+  "open": "main.tex",
+  "skills": ["check-citations", "consistent-terminology"]
+}

@@ -39,3 +39,6 @@ export type Snapshot = {
 /** How a Claude session starts: pick up the latest conversation, start fresh, or show Claude's picker. */
 export const CLAUDE_STARTS = ["continue", "new", "resume"] as const;
 export type ClaudeStart = (typeof CLAUDE_STARTS)[number];
+
+/** A starting point for a new workspace (templates/<name>/template.json). */
+export type TemplateInfo = { name: string; title: string; description: string };
