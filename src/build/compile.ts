@@ -12,6 +12,7 @@ export type CompileResult = {
 };
 
 const HAS_LATEXMK = Bun.which("latexmk") !== null;
+const HAS_BIBTEX = Bun.which("bibtex") !== null;
 
 // Unwrapped logs make errors parseable (TeX wraps at 79 chars by default).
 const TEX_ENV = { ...process.env, max_print_line: "10000", error_line: "254", half_error_line: "238" };
@@ -33,17 +34,35 @@ export async function compile(texPath: string, outDir: string): Promise<CompileR
   const cwd = path.dirname(texPath);
   const logPath = path.join(outDir, `${name}.log`);
   await mkdir(outDir, { recursive: true });
+  // \include{chapters/intro} writes chapters/intro.aux into the output folder, and TeX stops with
+  // "can't write" if that subfolder doesn't exist there.
+  const src = await readText(texPath);
+  for (const [, inc] of src.matchAll(/^[^%\n]*\\include\{([^}]+)\}/gm)) {
+    if (inc!.includes("/")) await mkdir(path.join(outDir, path.dirname(inc!)), { recursive: true });
+  }
 
   let ok: boolean;
+  const bibWarnings: Diagnostic[] = [];
   if (HAS_LATEXMK) {
     const flag = { pdflatex: "-pdf", xelatex: "-xelatex", lualatex: "-lualatex" }[engine];
     ok = await run(["latexmk", flag, ...TEX_FLAGS, `-outdir=${outDir}`, path.basename(texPath)], cwd);
   } else {
-    // No latexmk: rerun the engine until cross-references settle (max 3 passes).
+    // No latexmk: run BibTeX after the first pass if the document has a bibliography, then rerun
+    // the engine until citations and cross-references settle (max 4 passes).
     ok = false;
-    for (let pass = 0; pass < 3; pass++) {
+    let bibDone = !HAS_BIBTEX;
+    for (let pass = 0; pass < 4; pass++) {
       ok = await run([engine, ...TEX_FLAGS, `-output-directory=${outDir}`, path.basename(texPath)], cwd);
-      if (!ok || !/Rerun to get|Label\(s\) may have changed/.test(await readText(logPath))) break;
+      if (!ok) break;
+      if (!bibDone && /\\bibdata\{/.test(await readText(path.join(outDir, `${name}.aux`)))) {
+        bibDone = true;
+        // BibTeX runs in the output folder; point it back at the sources for .bib and .bst files.
+        const inputs = cwd + path.delimiter;
+        await run(["bibtex", name], outDir, { BIBINPUTS: inputs, BSTINPUTS: inputs });
+        bibWarnings.push(...parseBlg(await readText(path.join(outDir, `${name}.blg`))));
+        continue;
+      }
+      if (!/Rerun to get|Label\(s\) may have changed|There were undefined citations/.test(await readText(logPath))) break;
     }
   }
 
@@ -53,7 +72,7 @@ export async function compile(texPath: string, outDir: string): Promise<CompileR
     engine,
     pdfPath: path.join(outDir, `${name}.pdf`),
     pages: Number(log.match(/Output written on .*?\((\d+) pages?/)?.[1] ?? 0),
-    diagnostics: parseLog(log),
+    diagnostics: [...parseLog(log), ...bibWarnings],
     ms: Math.round(performance.now() - start),
   };
 }
@@ -84,8 +103,20 @@ export function parseLog(log: string): Diagnostic[] {
   return out;
 }
 
-async function run(cmd: string[], cwd: string): Promise<boolean> {
-  const proc = Bun.spawn(cmd, { cwd, env: TEX_ENV, stdin: "ignore", stdout: "ignore", stderr: "ignore" });
+/** BibTeX's own problems (a missing .bib, a malformed entry), which the LaTeX log doesn't show. */
+export function parseBlg(blg: string): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  for (const text of blg.split("\n")) {
+    const m = text.match(/^(I couldn't open .*|I found no .*|Warning--.*)$/) ?? text.match(/^(.*)---line (\d+) of file (.+)$/);
+    if (!m?.[1]?.trim()) continue; // a continuation line ("---line 3 of file x.aux") adds nothing
+    const isError = !text.startsWith("Warning--");
+    out.push({ severity: isError ? "error" : "warning", file: m[3] ? path.basename(m[3]) : undefined, line: m[2] ? Number(m[2]) : undefined, message: `BibTeX: ${m[1]}` });
+  }
+  return out;
+}
+
+async function run(cmd: string[], cwd: string, env: Record<string, string> = {}): Promise<boolean> {
+  const proc = Bun.spawn(cmd, { cwd, env: { ...TEX_ENV, ...env }, stdin: "ignore", stdout: "ignore", stderr: "ignore" });
   return (await proc.exited) === 0;
 }
 

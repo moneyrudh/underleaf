@@ -8,7 +8,7 @@ const ICONS = {
 };
 const FLASH_MS = 1600;
 
-/** Files the resume agent owns. Hidden by default so the tree stays about your documents. */
+/** Claude's own files (its instructions from you, and a resume workspace's memory). Hidden by default so the tree stays about your documents. */
 export const isAgentPath = (path: string) =>
   path === "latex/CLAUDE.md" || path === "latex/memory" || path.startsWith("latex/memory/");
 
@@ -82,6 +82,11 @@ export class FileTree {
 
   private listed(path: string) {
     return this.showAgent || !isAgentPath(path);
+  }
+
+  /** Any .tex file at all (documents and fragments): an empty folder offers the templates instead. */
+  hasTex(): boolean {
+    return this.files().some((f) => f.name.endsWith(".tex"));
   }
 
   firstDocument(): FileNode | undefined {

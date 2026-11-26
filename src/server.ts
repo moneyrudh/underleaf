@@ -12,7 +12,8 @@ import { recentWorkspaces } from "./workspace/registry";
  *               clients (tabs and the shared Claude session), watch (files changing), trees (the file tree)
  *   build/      compile (one LaTeX build), builds (per-document queue, last good PDF)
  *   history/    store (git-backed snapshots), snapshots (when they're taken)
- *   workspace/  files (scanning, kinds, watching), seed (templates, Claude hooks), registry (recent
+ *   workspace/  files (scanning, kinds, watching), templates (starting points, Claude's instructions),
+ *               claude-settings + guardrails (hooks, permission rules), registry (recent
  *               folders), pick (the system folder dialog)
  *   claude/     session (the claude CLI in a PTY), brief (workspace.md for Claude)
  * Types and messages shared with the page live in ../shared/.

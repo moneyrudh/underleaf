@@ -73,6 +73,12 @@ export function showPdf(url: string, { stale = false } = {}) {
   render();
 }
 
+/** Show something other than a file (the template picker). */
+export function showElement(el: HTMLElement) {
+  reset();
+  swap(el);
+}
+
 export function showMessage(html: string) {
   reset();
   const p = document.createElement("p");

@@ -22,7 +22,7 @@
 .tree .kind-image .ico { color: var(--kind-restore); }
 .tree .kind-other .name { color: var(--muted); }
 
-/* A root folder reads as a group label: "latex", "resumes". */
+/* A root folder reads as a group label ("latex"). */
 .tree .row.root {
   height: 30px;
   margin-top: 6px;

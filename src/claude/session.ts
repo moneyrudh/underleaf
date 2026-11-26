@@ -22,6 +22,8 @@ export class ClaudeSession {
   private cols = 100;
   private rows = 30;
   private sized = false; // the browser has reported the pane's real size
+  /** underleaf's instructions for Claude, passed with --append-system-prompt-file (null: the workspace's CLAUDE.md imports them). */
+  private instructions: string | null = null;
 
   constructor(
     private cwd: string,
@@ -77,6 +79,18 @@ export class ClaudeSession {
     this.cwd = dir;
   }
 
+  setInstructions(file: string | null) {
+    this.instructions = file;
+  }
+
+  /**
+   * The instructions changed (a template was applied): start a new conversation if one is running.
+   * A continued conversation keeps the instructions it started with until it's compacted.
+   */
+  renew() {
+    if (this.proc) this.restart("new");
+  }
+
   /** Switch folders: a running session restarts there and picks up that folder's last conversation. */
   moveTo(dir: string) {
     this.cwd = dir;
@@ -99,7 +113,8 @@ export class ClaudeSession {
     delete env.CLAUDECODE; // underleaf may itself be launched from inside a Claude Code session
 
     const startedAt = performance.now();
-    const proc = Bun.spawn([bin, ...START_ARGS[start]], {
+    const args = [...START_ARGS[start], ...(this.instructions ? ["--append-system-prompt-file", this.instructions] : [])];
+    const proc = Bun.spawn([bin, ...args], {
       cwd: this.cwd,
       env,
       terminal: { cols: this.cols, rows: this.rows, data: (_t, data) => this.emit(data) },

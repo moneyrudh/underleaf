@@ -1,36 +1,6 @@
 import path from "node:path";
-import { mkdir } from "node:fs/promises";
 import { API } from "../../shared/protocol";
 import { BLOCK_WRITES_OUTSIDE, GUARDRAILS, type Guardrails } from "./guardrails";
-
-/**
- * Install the agent setup from templates/ into the workspace.
- * - `.underleaf/` is owned by underleaf: refreshed whenever the template changes.
- * - Everything else (CLAUDE.md, memory, skills, settings) is copied only if missing,
- *   because the user and Claude personalize those files.
- * - An empty workspace also gets a starter resume.tex.
- */
-export async function seedWorkspace(latexDir: string, templatesDir: string) {
-  await mkdir(latexDir, { recursive: true });
-  const source = path.join(templatesDir, "workspace");
-  for await (const rel of new Bun.Glob("**/*").scan({ cwd: source, dot: true })) {
-    const template = await Bun.file(path.join(source, rel)).text();
-    const dest = path.join(latexDir, rel);
-    // Read via a fresh handle: in Bun 1.4.2, writing to a Bun.file() you've called
-    // .exists() on produces an empty file, so always write by path with explicit contents.
-    const current = await Bun.file(dest).text().catch(() => null);
-    if (rel === ".underleaf/id") continue; // each workspace's own; never copied from a template
-    const managed = rel.startsWith(".underleaf/");
-    // An empty file counts as missing: it was never personalized (and repairs bad copies).
-    if (managed ? current === template : current !== null && current.length > 0) continue;
-    await Bun.write(dest, template);
-    console.log(`${managed ? "updated" : "added"}   ${rel}`);
-  }
-
-  for await (const _ of new Bun.Glob("**/*.tex").scan({ cwd: latexDir })) return;
-  await Bun.write(path.join(latexDir, "resume.tex"), Bun.file(path.join(templatesDir, "resume.tex")));
-  console.log(`added   resume.tex (starter template)`);
-}
 
 type Settings = {
   hooks?: Record<string, { hooks: { url?: string; command?: string }[] }[]>;
@@ -48,8 +18,10 @@ type Settings = {
  *   snapshot label) and ends (take the snapshot). HTTP hooks can't interpolate env vars into the URL,
  *   so the current port is written in on every start; the per-run token travels in a header and only
  *   exists in the environment underleaf gives Claude.
+ * - `insideCheckout` (the checkout's own latex/): auto memory off. Claude Code keys it per git repo,
+ *   so it would be shared with Claude sessions working on underleaf itself.
  */
-export async function ensureClaudeSettings(dir: string, hookBase: string | null) {
+export async function ensureClaudeSettings(dir: string, hookBase: string | null, { insideCheckout = false } = {}) {
   const file = path.join(dir, ".claude", "settings.json");
   const raw = await Bun.file(file).text().catch(() => "{}");
   let settings: Settings;
@@ -69,6 +41,7 @@ export async function ensureClaudeSettings(dir: string, hookBase: string | null)
     permissions[kind] = [...(permissions[kind] ?? []).filter((r) => !mine.has(r)), ...GUARDRAILS[kind]];
   }
   permissions[BLOCK_WRITES_OUTSIDE] = true;
+  if (insideCheckout) settings.autoMemoryEnabled = false;
 
   if (hookBase) {
     const hooks = (settings.hooks ??= {});

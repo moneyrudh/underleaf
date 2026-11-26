@@ -1,0 +1,42 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[round]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\title{Article Title}
+\author{Your Name}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+One paragraph: the problem, what you did, and what you found.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Introduce the question. Cite related work from \texttt{references.bib}, for example
+\citet{lamport1994latex}.
+
+\section{Method}
+\label{sec:method}
+
+\section{Results}
+\label{sec:results}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

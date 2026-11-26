@@ -1,0 +1,6 @@
+{
+  "title": "Article",
+  "description": "A single-file paper with an abstract and a bibliography.",
+  "open": "main.tex",
+  "skills": ["check-citations"]
+}

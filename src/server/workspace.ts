@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { access, constants, realpath, stat } from "node:fs/promises";
+import { access, constants, mkdir, realpath, stat } from "node:fs/promises";
 import { DEFAULT_DIR, PORT } from "./config";
 import { REPO } from "../repo";
 import { HOME } from "../home";
@@ -10,7 +10,8 @@ import { closeHistory, flushEditSnapshot, openHistory } from "../history/snapsho
 import { forkWorkspaceId, workspaceId } from "../history/store";
 import { docs, rescan, scheduleBrief, treeMessage } from "./trees";
 import { startWatching, stopWatching } from "./watch";
-import { ensureClaudeSettings, seedWorkspace } from "../workspace/seed";
+import { ensureClaudeSettings } from "../workspace/claude-settings";
+import { applyTemplate, claudeMdImportsInstructions, isEmptyWorkspace, writeInstructions } from "../workspace/templates";
 import { copiedFrom, recentWorkspaces, rememberWorkspace } from "../workspace/registry";
 import { build } from "../build/builds";
 import type { WorkspaceMessage } from "../../shared/protocol";
@@ -58,7 +59,7 @@ export async function unusable(dir: string): Promise<string | null> {
   return null;
 }
 
-let switching: Promise<void> = Promise.resolve();
+let switching: Promise<unknown> = Promise.resolve();
 
 /** Open `dir` as the workspace (serialized: two quick switches never interleave). */
 export function openWorkspace(dir: string): Promise<void> {
@@ -72,12 +73,12 @@ async function open(dir: string) {
 
   // Everything that can fail for the new folder (it's read-only, say) happens before the old one
   // is closed, so a refused switch leaves the old workspace running as it was.
-  // A fresh checkout's own documents folder gets the starter setup; folders you open get only what
-  // underleaf needs to work in them (.underleaf/, and its hooks and guardrails in .claude/settings.json).
+  // underleaf adds only what it needs to work in a folder: .underleaf/ (id, instructions, status)
+  // and its hooks and guardrails in .claude/settings.json. An empty folder offers the templates.
   const isDefault = dir === (await canonical(DEFAULT_DIR));
-  if (isDefault) await seedWorkspace(dir, path.join(REPO, "templates"));
-  // Guardrails always; the turn hooks only matter with history, which needs git.
-  await ensureClaudeSettings(dir, Bun.which("git") ? `http://127.0.0.1:${PORT}` : null);
+  if (isDefault) await mkdir(dir, { recursive: true }); // a fresh checkout has no latex/ yet
+  await ensureClaudeSettings(dir, hookBase(), { insideCheckout: isDefault });
+  const instructions = await writeInstructions(dir);
   let id = await workspaceId(dir);
   // A copy would otherwise share the original's history, build folder and the page's saved state.
   const original = await copiedFrom(dir, id);
@@ -101,6 +102,7 @@ async function open(dir: string) {
   await rescan();
   scheduleBrief();
   await rememberWorkspace(dir);
+  claude.setInstructions((await claudeMdImportsInstructions(dir)) ? null : instructions);
   if (previous) claude.moveTo(dir); // Claude picks up this folder's last conversation
   else claude.setCwd(dir);
 
@@ -113,6 +115,35 @@ async function open(dir: string) {
   (async () => {
     for (const doc of docs) if (gen === generation) await build(doc);
   })();
+}
+
+/** Where Claude's hooks report turns; they only matter with history, which needs git. */
+const hookBase = () => (Bun.which("git") ? `http://127.0.0.1:${PORT}` : null);
+
+/**
+ * Fill the open (empty) workspace from a template, then start Claude afresh so it has the template's
+ * instructions. Returns the tree path of the document to open first, or throws with a reason.
+ */
+export function startFromTemplate(name: string): Promise<string> {
+  const next = switching.then(() => fillFromTemplate(name)); // never in the middle of a switch
+  switching = next.catch(() => {});
+  return next;
+}
+
+async function fillFromTemplate(name: string): Promise<string> {
+  const w = current();
+  if (!(await isEmptyWorkspace(w.dir))) throw new Error("This folder already has .tex files. Templates only fill an empty folder.");
+  const open = await applyTemplate(w.dir, name);
+  await ensureClaudeSettings(w.dir, hookBase(), { insideCheckout: w.dir === (await canonical(DEFAULT_DIR)) });
+  claude.setInstructions((await claudeMdImportsInstructions(w.dir)) ? null : await writeInstructions(w.dir));
+  claude.renew();
+  await rescan();
+  broadcast(treeMessage());
+  const gen = generation;
+  (async () => {
+    for (const doc of docs) if (gen === generation) await build(doc);
+  })();
+  return `latex/${open}`;
 }
 
 /** Open `dir`, or say why not (refused, or it failed partway and the old workspace stayed open). */
