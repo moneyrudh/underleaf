@@ -10,7 +10,7 @@ import { closeHistory, flushEditSnapshot, openHistory } from "../history/snapsho
 import { forkWorkspaceId, workspaceId } from "../history/store";
 import { docs, rescan, scheduleBrief, treeMessage } from "./trees";
 import { startWatching, stopWatching } from "./watch";
-import { ensureClaudeHooks, seedWorkspace } from "../workspace/seed";
+import { ensureClaudeSettings, seedWorkspace } from "../workspace/seed";
 import { copiedFrom, recentWorkspaces, rememberWorkspace } from "../workspace/registry";
 import { build } from "../build/builds";
 import type { WorkspaceMessage } from "../../shared/protocol";
@@ -73,10 +73,11 @@ async function open(dir: string) {
   // Everything that can fail for the new folder (it's read-only, say) happens before the old one
   // is closed, so a refused switch leaves the old workspace running as it was.
   // A fresh checkout's own documents folder gets the starter setup; folders you open get only what
-  // underleaf needs to work in them (.underleaf/ and the Claude hooks).
+  // underleaf needs to work in them (.underleaf/, and its hooks and guardrails in .claude/settings.json).
   const isDefault = dir === (await canonical(DEFAULT_DIR));
   if (isDefault) await seedWorkspace(dir, path.join(REPO, "templates"));
-  if (Bun.which("git")) await ensureClaudeHooks(dir, `http://127.0.0.1:${PORT}`);
+  // Guardrails always; the turn hooks only matter with history, which needs git.
+  await ensureClaudeSettings(dir, Bun.which("git") ? `http://127.0.0.1:${PORT}` : null);
   let id = await workspaceId(dir);
   // A copy would otherwise share the original's history, build folder and the page's saved state.
   const original = await copiedFrom(dir, id);

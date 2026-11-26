@@ -47,7 +47,7 @@ Options: `bun dev [folder] [--port N] [--no-open]`.
 
 A workspace is one folder of documents: a thesis, a set of resumes, a paper. Each has its own files, version history, and Claude conversation, so a thesis and a resume never share instructions or memory.
 
-The folder name in the title bar switches between workspaces you've opened, and **Open folder…** opens another one with your system's folder dialog (also in the command palette, along with **Switch workspace…**). Switching swaps the file tree, the history and Claude's folder; Claude picks up that folder's last conversation. underleaf adds two small things to a folder you open: `.underleaf/` (the history id and a status file for Claude) and its hooks in `.claude/settings.json`.
+The folder name in the title bar switches between workspaces you've opened, and **Open folder…** opens another one with your system's folder dialog (also in the command palette, along with **Switch workspace…**). Switching swaps the file tree, the history and Claude's folder; Claude picks up that folder's last conversation. underleaf adds two small things to a folder you open: `.underleaf/` (the history id and a status file for Claude) and, in `.claude/settings.json`, its hooks and the permission rules described under [Security](#security).
 
 With no folder given, a fresh checkout uses its own `latex/` folder (git-ignored, so personal files never end up in this repo) and gives it the starter resume setup: a `resume.tex` from `templates/resume.tex` plus the agent files below. Folders you open don't get those added.
 
@@ -91,7 +91,7 @@ On startup, underleaf sets up `latex/` as a workspace for a resume-focused agent
 | `.underleaf/workspace.md` | underleaf | Live snapshot: every document's compile status, page count, errors, and what's open. Claude re-reads it after edits. |
 | `memory/profile.md`, `memory/experience.yaml`, `memory/applications.md` | Claude & you | Long-term memory: who you are, a structured bank of every role and bullet, and a log of tailored applications. |
 | `.claude/skills/` | Claude & you | `tailor-resume`, `fit-one-page`, `update-memory`. Claude uses them automatically, or you can type `/tailor-resume`. |
-| `.claude/settings.json` | you | Accepts file edits without prompting, and turns off Claude Code's built-in auto memory so `memory/` is the single source. |
+| `.claude/settings.json` | you | Accepts file edits without prompting, and turns off Claude Code's built-in auto memory so `memory/` is the single source. underleaf merges in its hooks and permission rules on every start and leaves the rest alone. |
 
 Files marked "you" or "Claude & you" are copied in only when missing, so your changes are never overwritten. Everything lives in the git-ignored `latex/`, so it stays private. For history, run `git init` inside `latex/`.
 
@@ -147,6 +147,17 @@ On macOS, `Ctrl+Space` switches input sources if you have more than one keyboard
 ### Security
 
 The server only listens on `127.0.0.1`, and it rejects requests from other origins and hosts. That matters because it can drive a coding agent.
+
+Claude is set up to help with the workspace's documents and to decline other tasks. Because a document can contain instructions too (a pasted job description, a downloaded paper), underleaf also writes permission rules into each workspace's `.claude/settings.json` (`src/workspace/guardrails.ts`):
+
+| Claude can't | Why |
+|---|---|
+| Fetch web pages, or run `curl` / `wget` | the easiest way to slip instructions in or data out |
+| Delete files (`rm`, `rmdir`, `unlink`, `git clean`) | restoring from history is easy; undoing a deletion isn't |
+| Write outside the workspace | it's there for this folder only (needs Claude Code 2.1.314 or later) |
+| Edit `.underleaf/` or `.claude/settings*.json` | underleaf's own files, and the rules themselves |
+
+Editing `CLAUDE.md` or anything else in `.claude/` (skills) always asks you first. Deny rules in project settings win over allow rules in any other settings file and apply in every permission mode. The shell rules match the command Claude writes, so they stop the usual form (`rm file`) but not every disguise (`/bin/rm`, `sh -c "…"`). They guard against mistakes and casual misuse; for a hard boundary, turn on Claude Code's [sandboxing](https://code.claude.com/docs/en/sandboxing).
 
 ## How it works
 
