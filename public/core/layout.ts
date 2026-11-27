@@ -48,7 +48,7 @@ export function focusPane(name: PaneName) {
 
 /** The middle column holds Claude or the Source editor: focus whichever is showing. */
 function focusMiddle() {
-  if (PANES.claude.dataset.mid === "source" && editor.path) editor.focus("raw");
+  if (PANES.claude.dataset.mid === "source" && editor.path) editor.focus();
   else claude.focus();
 }
 

@@ -1,6 +1,8 @@
 import * as pdfjs from "pdfjs-dist";
 import { $ } from "../core/util";
 import type { Diagnostic } from "../../shared/types";
+import type { TextRun } from "../compare/diffcore";
+import { attachPageEditing, type PageText } from "./pageedit";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.mjs";
 
@@ -15,6 +17,8 @@ const body = $("preview-body"); // carries the busy/stale bar along its top edge
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 let currentPdf: string | null = null;
+/** The live document's PDF, whose text can be edited on the page (never an earlier version's). */
+let editable = false;
 let zoom: number | "fit" = "fit";
 let renderedScale = 1; // what "fit" resolved to on the last render
 let renderToken = 0;
@@ -64,11 +68,16 @@ function swap(el: HTMLElement) {
   keepScrollOnSwap = true;
 }
 
-/** Show a PDF; re-renders only when the URL changes (it carries a version). */
-export function showPdf(url: string, { stale = false } = {}) {
+/**
+ * Show a PDF; re-renders only when the URL changes (it carries a version). `editable`: the open
+ * document's own, current, good build, so its text can be edited on the page.
+ */
+export function showPdf(url: string, { stale = false, editable: canEdit = false } = {}) {
   viewer.classList.toggle("stale", stale);
   body.classList.toggle("stale", stale);
-  if (url === currentPdf) return void viewer.classList.remove("loading");
+  const editableChanged = canEdit !== editable;
+  editable = canEdit;
+  if (url === currentPdf && !editableChanged) return void viewer.classList.remove("loading");
   currentPdf = url;
   render();
 }
@@ -125,6 +134,8 @@ async function render() {
     const pagesEl = document.createElement("div");
     pagesEl.className = "pages";
     const available = viewer.clientWidth - 48;
+    const withText = editable;
+    const pages: PageText[] = [];
 
     for (let n = 1; n <= pdf.numPages; n++) {
       const page = await pdf.getPage(n);
@@ -132,10 +143,24 @@ async function render() {
       if (n === 1) renderedScale = scale;
       const canvas = await renderPage(page, scale);
       if (token !== renderToken) return;
-      pagesEl.append(canvas);
+      // Each page sits in a box the editing layer can be laid over.
+      const wrap = document.createElement("div");
+      wrap.className = "page-wrap";
+      wrap.append(canvas);
+      pagesEl.append(wrap);
+      if (withText) {
+        const runs: TextRun[] = [];
+        for (const item of (await page.getTextContent()).items) {
+          if (!("str" in item) || !item.str) continue;
+          const [, , c, d, x, y] = item.transform as number[];
+          runs.push({ page: n, str: item.str, x: x!, y: y!, w: item.width, h: item.height || Math.hypot(c!, d!), eol: item.hasEOL });
+        }
+        pages.push({ wrap, viewport: page.getViewport({ scale }), runs });
+      }
     }
 
     swap(pagesEl);
+    if (withText && token === renderToken) void attachPageEditing(pages);
   } catch (err) {
     if (token === renderToken) showMessage(`Couldn't render this PDF.<br><small>${String(err).replace(/</g, "&lt;")}</small>`);
   } finally {

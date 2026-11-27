@@ -1,8 +1,5 @@
-@import "katex/dist/katex.min.css";
-
-/* Editing. The middle column switches between Claude and the open file's LaTeX (Source); the preview
-   shows LaTeX files in the visual editor (documents can switch to the PDF), and other text files in
-   the raw editor ("full"). */
+/* Editing. The middle column switches between Claude and the open document's LaTeX (Source); other
+   text files fill the preview with the editor ("full"). Editing on the page itself is in preview.css. */
 
 /* ---------- middle column: Claude / Source ---------- */
 
@@ -19,18 +16,17 @@
 
 /* ---------- preview: the editors ---------- */
 
-.editor-col, .visual-col { display: none; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.editor-col { display: none; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .preview-body[data-editor="full"] .editor-col { display: flex; background: var(--panel); }
-.preview-body[data-editor="visual"] .visual-col { display: flex; }
 .preview-body[data-editor] .viewer-col { display: none; }
 
-/* An earlier version or a comparison is about the past: the live file's editors step aside. */
-.preview-body:has(#snapshot-banner:not([hidden])) :is(.editor-col, .visual-col),
-.preview-body:has(.viewer-col.comparing) :is(.editor-col, .visual-col) { display: none; }
+/* An earlier version or a comparison is about the past: the live file's editor steps aside. */
+.preview-body:has(#snapshot-banner:not([hidden])) .editor-col,
+.preview-body:has(.viewer-col.comparing) .editor-col { display: none; }
 .preview-body[data-editor]:has(#snapshot-banner:not([hidden])) .viewer-col,
 .preview-body[data-editor]:has(.viewer-col.comparing) .viewer-col { display: flex; }
 /* Zoom is for the PDF. */
-.preview-pane:has(.preview-body[data-editor]) #zoom { display: none; }
+.preview-pane:has(.preview-body[data-editor="full"]) #zoom { display: none; }
 
 .editor { flex: 1; min-height: 0; }
 .editor .cm-editor { height: 100%; }
@@ -54,79 +50,3 @@
 .editor-state[data-state="unsaved"], .editor-state[data-state="saving"] { color: var(--muted); }
 .editor-state[data-state="conflict"] { color: var(--warn); }
 .editor-state[data-state="error"] { color: var(--error); }
-
-/* ---------- the visual editor: a page on the desk ---------- */
-
-.format-bar { flex: none; display: flex; align-items: center; gap: 2px; padding: 4px 10px; border-bottom: 1px solid var(--line); background: var(--chrome); }
-.format-bar .spacer { flex: 1; }
-.fbtn {
-  min-width: 28px;
-  height: 26px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font: 500 13px/1 var(--ui);
-  cursor: pointer;
-}
-.fbtn:hover { background: var(--sunken); color: var(--ink); }
-.fsep { width: 1px; height: 16px; margin: 0 6px; background: var(--line); }
-
-.visual { flex: 1; min-height: 0; background: var(--desk); }
-.visual .cm-editor { height: 100%; background: transparent; }
-.visual .cm-scroller { font-family: var(--tex); font-size: 17px; line-height: 1.65; }
-.visual .cm-content {
-  max-width: 44em;
-  margin: 24px auto 48px;
-  padding: 56px 64px;
-  background: var(--panel);
-  box-shadow: var(--shadow-page);
-  caret-color: var(--leaf);
-}
-.visual .cm-line { padding: 0; }
-.visual .cm-activeLine { background: transparent; }
-
-.visual .vh { font-family: var(--tex); font-weight: 600; color: var(--ink); }
-.visual .vh-0, .visual .vh-1 { font-size: 1.85em; line-height: 1.25; padding-top: 0.6em; }
-.visual .vh-2 { font-size: 1.4em; line-height: 1.3; padding-top: 0.5em; }
-.visual .vh-3 { font-size: 1.18em; padding-top: 0.35em; }
-.visual .vh-4 { font-size: 1.05em; padding-top: 0.25em; }
-.visual .vh-5 { font-size: 1em; }
-
-.visual .vs-bold { font-weight: 700; }
-.visual .vs-italic { font-style: italic; }
-.visual .vs-underline { text-decoration: underline; }
-.visual .vs-mono { font-family: var(--mono); font-size: 0.88em; }
-.visual .vs-smallcaps { font-variant: small-caps; }
-.visual .vs-caption { font-size: 0.9em; color: var(--muted); }
-.visual .vm-env-label { display: block; margin-top: 0.6em; font: 600 0.85em/1.6 var(--ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); text-align: center; }
-
-/* LaTeX the view shows as written (where the cursor is, or what it doesn't know). */
-.visual .vm-raw { font-family: var(--mono); font-size: 0.82em; }
-.visual .vm-comment { font-family: var(--mono); font-size: 0.78em; color: var(--syn-comment); }
-
-.visual .vm-chip {
-  display: inline-block;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--sunken);
-  color: var(--muted);
-  font: 500 0.72em/1.7 var(--ui);
-  vertical-align: 0.1em;
-}
-.visual .vm-cite, .visual .vm-ref { color: var(--leaf); background: var(--leaf-soft); }
-.visual .vm-label { opacity: 0.7; }
-.visual .vm-include[role="button"], .visual .vm-preamble[role="button"] { cursor: pointer; }
-.visual .vm-include:hover, .visual .vm-preamble:hover { color: var(--ink); }
-.visual .vm-preamble { margin-bottom: 1em; }
-
-.visual .vm-bullet { display: inline-block; min-width: 1.4em; color: var(--muted); }
-.visual .vm-math { color: var(--ink); }
-.visual .vm-display { display: block; margin: 0.4em 0; text-align: center; overflow-x: auto; }
-.visual .vm-figure { margin: 0.6em 0; text-align: center; }
-.visual .vm-figure img { max-width: 100%; max-height: 50vh; }
-
-@media (max-width: 1100px) {
-  .visual .cm-content { padding: 32px 28px; margin: 12px; }
-}

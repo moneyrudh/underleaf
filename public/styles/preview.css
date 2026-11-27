@@ -69,7 +69,32 @@
   background-size: 4px 4px;
 }
 .pages { display: flex; flex-direction: column; align-items: center; gap: 18px; width: max-content; min-width: 100%; }
-.page { display: block; background: white; box-shadow: var(--shadow-page); }
+.page { display: block; background: var(--paper); box-shadow: var(--shadow-page); }
+
+/* Editing on the page: a layer over each page; each component (a title, a bullet, a paragraph) is a
+   target with one box per printed line it covers, and they light up together. */
+.page-wrap { position: relative; }
+.edit-layer { position: absolute; inset: 0; }
+.edit-rect { position: absolute; border-radius: 3px; cursor: text; }
+.edit-target:hover > .edit-rect { background: var(--leaf-soft); box-shadow: 0 0 0 1px var(--leaf); }
+.edit-input {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  outline: 2px solid var(--leaf);
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-family: var(--tex);
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+/* Written to the source; the rebuilt page replaces it in a moment. */
+.edit-input.pending { outline-style: dashed; opacity: 0.85; cursor: progress; }
+.viewer.stale .edit-layer { display: none; }
 .viewer > * { transition: opacity 150ms ease-out; }
 .viewer.loading > * { opacity: 0.45; } /* switching files/versions: dim until the next view is ready */
 .viewer .pages { transition: opacity 180ms ease-out; }

@@ -74,7 +74,7 @@
             <button class="primary" data-editor-action="keep-mine">Keep mine</button>
           </div>
           <div id="source" class="editor"></div>
-          <p id="source-empty" class="message">Open a <code>.tex</code> file to see its LaTeX here.</p>
+          <p id="source-empty" class="message">Open a document to see its LaTeX here.</p>
         </div>
       </section>
       <div class="splitter" data-pane="claude-pane" data-var="--claude-w"></div>
@@ -84,10 +84,6 @@
           <span id="preview-title" class="pane-title file">Preview</span>
           <span id="status" class="status" role="status"></span>
           <span class="spacer"></span>
-          <div id="view-seg" class="seg" role="group" aria-label="Show" hidden>
-            <button id="view-visual">Visual</button>
-            <button id="view-pdf">PDF</button>
-          </div>
           <div id="zoom" class="menu-wrap">
             <button id="zoom-menu-btn" class="select" aria-haspopup="menu" aria-controls="zoom-menu" data-tip="Zoom">
               <span id="zoom-label">Fit</span><span class="chev">▾</span>
@@ -173,30 +169,6 @@
             </div>
             <div id="editor" class="editor"></div>
             <div class="editor-foot"><span class="editor-state" role="status"></span></div>
-          </div>
-          <div id="visual-col" class="visual-col">
-            <div class="format-bar" role="toolbar" aria-label="Formatting">
-              <button class="fbtn" data-format="bold" data-tip="Bold" data-key="mod+b" aria-label="Bold"><b>B</b></button>
-              <button class="fbtn" data-format="italic" data-tip="Italic" data-key="mod+i" aria-label="Italic"><i>I</i></button>
-              <span class="fsep"></span>
-              <button class="fbtn" data-format="section" data-tip="Section heading" aria-label="Section heading">H1</button>
-              <button class="fbtn" data-format="subsection" data-tip="Subsection heading" aria-label="Subsection heading">H2</button>
-              <button class="fbtn" data-format="text" data-tip="Normal text" aria-label="Normal text">¶</button>
-              <span class="fsep"></span>
-              <button class="fbtn" data-format="list" data-tip="Bulleted list" aria-label="Bulleted list">•</button>
-              <button class="fbtn" data-format="numbered" data-tip="Numbered list" aria-label="Numbered list">1.</button>
-              <button class="fbtn" data-format="math" data-tip="Math" data-key="mod+m" aria-label="Math">∑</button>
-              <button class="fbtn" data-format="cite" data-tip="Citation" aria-label="Citation">[ ]</button>
-              <span class="spacer"></span>
-              <span class="editor-state" role="status"></span>
-            </div>
-            <div class="editor-conflict" role="alert" hidden>
-              <span>This file changed on disk while you were editing it.</span>
-              <span class="spacer"></span>
-              <button class="ghost" data-editor-action="take-theirs">Use the version on disk</button>
-              <button class="primary" data-editor-action="keep-mine">Keep mine</button>
-            </div>
-            <div id="visual" class="visual"></div>
           </div>
           <div class="viewer-col">
             <div id="snapshot-banner" class="snapshot-banner" hidden>

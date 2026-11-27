@@ -12,7 +12,7 @@ import type { DirNode, FileNode } from "../../shared/types";
 import { API, url } from "../../shared/protocol";
 import { loadSaveTarget, savePdf } from "./save";
 import { showTemplates } from "./templates";
-import { editor, isLatex } from "../editor/editor";
+import { editor } from "../editor/editor";
 
 /** Opening files, keeping the preview in step with the file tree, and acting on files. */
 
@@ -25,21 +25,8 @@ export function initOpening() {
   $("quick-open").onclick = quickOpen;
   $("tab-claude").onclick = () => showMiddle("claude", true);
   $("tab-source").onclick = () => showMiddle("source", true);
-  $("view-visual").onclick = () => setPreviewView("visual");
-  $("view-pdf").onclick = () => setPreviewView("pdf");
   showMiddle(storage(STORED.middle) === "source" ? "source" : "claude");
-  editor.hooks = {
-    imageUrl: findImage,
-    openFile: (file) => {
-      const node = findIncluded(file);
-      if (node) open(node);
-      else toast(`Couldn't find ${file}`);
-    },
-    showSource: (at) => {
-      showMiddle("source");
-      editor.focus("raw", at);
-    },
-  };
+
   window.addEventListener("hashchange", () => {
     const file = tree.find(decodeURIComponent(location.hash.slice(1)));
     if (file && file.path !== state.selected?.path) open(file);
@@ -128,7 +115,7 @@ export function open(file: FileNode) {
   if (file.kind === "pdf") preview.showPdf(fileUrl);
   else if (file.kind === "image") preview.showImage(fileUrl);
   else if (file.kind === "tex" || file.kind === "text") {
-    // Text files open in an editor (visual for LaTeX); the viewer only shows them for earlier versions.
+    // Text files open in the editor (it fills the pane); the viewer only shows them for earlier versions.
     if (file.kind === "tex") preview.setStatus("Part of another document", "info", "No \\documentclass: another file includes this one. Saving it rebuilds the documents that are open.");
   } else {
     preview.showMessage(`No preview for <strong>${escapeHtml(file.name)}</strong>.<br>Download it from the ⋯ menu.`);
@@ -153,45 +140,25 @@ export function showNothing() {
   preview.showMessage("Pick a file on the left, or ask Claude to create a <code>.tex</code> file here.");
 }
 
-// ---------- editing: Visual / PDF in the preview, Claude / Source in the middle ----------
+// ---------- editing: on the page, in Source (middle column), or a plain text editor ----------
 
 /**
- * LaTeX files show the visual editor in the preview (documents can switch to the PDF), and their
- * LaTeX in the middle column's Source tab. Other text files (.bib, notes) open in the raw editor,
- * which fills the preview. While an earlier version or a comparison is on screen, the editors step
- * aside on their own (CSS).
+ * A document shows its PDF, whose text can be edited on the page (preview/pageedit.ts), and its
+ * LaTeX in the middle column's Source tab. Other text files (\input chapters, .bib, notes) open in
+ * the editor, which fills the preview. While an earlier version or a comparison is on screen, the
+ * editor steps aside on its own (CSS).
  */
-function editorMode(file: FileNode | null): "visual" | "full" | null {
-  if (!file) return null;
-  if (file.kind === "tex") return "visual"; // an \input fragment has no PDF of its own
-  if (file.kind === "doc") return storage(STORED.previewView) === "pdf" ? null : "visual";
-  if (file.kind === "text") return "full";
-  return null;
-}
-
 function showEditor(file: FileNode | null) {
-  const mode = editorMode(file);
   const body = $("preview-body");
-  const before = body.dataset.editor;
-  if (mode) body.dataset.editor = mode;
+  const full = file?.kind === "tex" || file?.kind === "text";
+  if (full) body.dataset.editor = "full";
   else delete body.dataset.editor;
-  $("view-seg").hidden = file?.kind !== "doc";
-  $("view-visual").classList.toggle("on", mode === "visual");
-  $("view-pdf").classList.toggle("on", file?.kind === "doc" && mode !== "visual");
-  $("claude-pane").toggleAttribute("data-has-source", isLatex(file));
-  if (file && (isLatex(file) || file.kind === "text")) void editor.open(file);
+  $("claude-pane").toggleAttribute("data-has-source", file?.kind === "doc");
+  if (file && (file.kind === "doc" || full)) void editor.open(file);
   else void editor.close();
-  if (before !== body.dataset.editor) requestAnimationFrame(() => preview.refit()); // the PDF may be back on screen
 }
 
-/** The preview of a LaTeX document: the visual editor, or the compiled PDF. */
-export function setPreviewView(view: "visual" | "pdf") {
-  storage(STORED.previewView, view);
-  showEditor(state.selected);
-  if (view === "visual") setTimeout(() => editor.focus("visual"), 50);
-}
-
-/** The middle column: Claude's terminal, or the open file's LaTeX. */
+/** The middle column: Claude's terminal, or the open document's LaTeX. */
 export function showMiddle(which: "claude" | "source", focus = false) {
   storage(STORED.middle, which);
   const pane = $("claude-pane");
@@ -202,34 +169,12 @@ export function showMiddle(which: "claude" | "source", focus = false) {
   $("tab-source").setAttribute("aria-selected", String(which === "source"));
   if (!focus) return;
   if (which === "claude") focusPane("claude");
-  else setTimeout(() => editor.focus("raw"), 50);
+  else setTimeout(() => editor.focus(), 50);
 }
 
 /** e: switch the middle column between Claude and Source. */
 export function toggleMiddle() {
   showMiddle($("claude-pane").dataset.mid === "source" ? "claude" : "source", true);
-}
-
-/** An image an \includegraphics names: next to the open file, in figures/, or at the workspace root; extensions optional. */
-function findImage(name: string): string | null {
-  const dir = state.selected?.path.replace(/\/[^/]*$/, "") ?? "latex";
-  for (const base of [dir, `${dir}/figures`, "latex", "latex/figures"]) {
-    for (const ext of ["", ".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp"]) {
-      const node = tree.find(`${base}/${name}${ext}`.replace(/\/\.\//g, "/"));
-      if (node?.kind === "image") return url(API.file, { path: node.path, v: node.mtime });
-    }
-  }
-  return null;
-}
-
-/** A file an \include / \input names, relative to the open file (".tex" optional). */
-function findIncluded(name: string): FileNode | undefined {
-  const dir = state.selected?.path.replace(/\/[^/]*$/, "") ?? "latex";
-  for (const base of [dir, "latex"]) {
-    const node = tree.find(`${base}/${name}.tex`) ?? tree.find(`${base}/${name}`);
-    if (node) return node;
-  }
-  return undefined;
 }
 
 /** "2 agent files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */

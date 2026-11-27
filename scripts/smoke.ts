@@ -172,16 +172,6 @@ await check("every element id the code looks up exists in index.html", async () 
 
 await cdp.send("Page.navigate", { url: `http://localhost:${port}/#latex/main.tex` });
 
-await check("a LaTeX document opens in the visual editor: headings and text shown, markup hidden", async () => {
-  await waitFor("document.getElementById('preview-body').dataset.editor === 'visual'", "the visual editor", 20_000);
-  await waitFor("[...document.querySelectorAll('#visual .vh')].some(h => h.textContent.includes('Professional Summary'))", "the section heading, rendered", 10_000);
-  const shown = await js<string>("document.querySelector('#visual .cm-content').innerText");
-  expect(!shown.includes("\\section{"), "\\section{ is visible in the visual view");
-  expect(!shown.includes("\\documentclass"), "the preamble isn't folded away");
-  // The rest of these checks look at the PDF; the choice is remembered, as it is for you.
-  await click("#view-pdf");
-});
-
 await check("opens and compiles the document", async () => {
   await waitFor("document.querySelectorAll('#viewer canvas.page').length > 0", "first PDF page", 20_000);
   await waitFor("document.getElementById('status').textContent.startsWith('Built')", "the Built status", 20_000); // a background build may still be finishing
@@ -508,33 +498,63 @@ await check("e shows a document's LaTeX in the middle column; ⌘S there saves t
   await waitFor("document.getElementById('claude-pane').dataset.mid === 'claude' && document.querySelector('#terminal .xterm-rows')?.offsetParent !== null", "Claude back in the middle");
 });
 
-await check("typing in the visual editor writes LaTeX: formatting, escaped characters, Enter for a new paragraph", async () => {
+await check("editing on the page: components (a title, a place, a paragraph) edited in place, markup untouched", async () => {
   const paper = path.join(latex, "paper.tex");
-  await Bun.write(paper, "\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nSee $x^2$ and \\cite{knuth}.\n\\begin{itemize}\n  \\item first\n\\end{itemize}\n\\end{document}\n");
+  await Bun.write(
+    paper,
+    "\\documentclass{article}\n\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}\n\\begin{document}\n\\section{Intro}\n" +
+      "The quick brown fox jumps over the lazy dog.\n\n\\job{Engineer}{Acme}\n\nSome \\textbf{bold words} here.\n\n" +
+      "This paragraph is long enough to wrap onto a second printed line of the page, so one component covers two lines " +
+      "and is edited as a single target that ends with zebra.\n\\end{document}\n",
+  );
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'paper.tex')", "paper.tex listed", 10_000);
   await press("p", [MOD]);
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "paper.tex" });
   await press("Enter");
-  await click("#view-visual");
-  await waitFor("document.querySelector('#visual .vh-2')?.textContent === 'Intro'", "the heading", 10_000);
-  expect(await js<boolean>("!!document.querySelector('#visual .katex')"), "math isn't rendered");
-  expect(await js<boolean>("[...document.querySelectorAll('#visual .vm-cite')].some(c => c.textContent === '[knuth]')"), "the citation chip is missing");
-  expect(await js<boolean>("[...document.querySelectorAll('#visual .vm-bullet')].some(b => b.textContent === '•')"), "the list bullet is missing");
-  // Visual focuses the editor (through CodeMirror, as a click would) with the cursor where the text starts,
-  // before the heading: type a paragraph there.
-  await click("#view-visual");
-  await waitFor("document.activeElement?.closest('#visual') !== null", "the visual editor focused");
-  await cdp.send("Input.insertText", { text: "Costs 5% & up" });
-  await press("Enter");
-  await until(async () => (await Bun.file(paper).text()).includes("Costs 5\\% \\& up\n\n"), 5_000, "escaped text and a paragraph break on disk").catch(async (e) => {
-    throw new Error(`${(e as Error).message}; on disk: ${JSON.stringify(await Bun.file(paper).text())}`);
-  });
-  await click(".format-bar [data-format='bold']");
-  await cdp.send("Input.insertText", { text: "strong" });
-  await until(async () => (await Bun.file(paper).text()).includes("\\textbf{strong}"), 5_000, "bold written as \\textbf");
-  await waitFor("[...document.querySelectorAll('#visual .vs-bold')].length > 0 || document.querySelector('#visual .vm-raw')?.textContent.includes('textbf')", "bold in the view");
-  await click("#view-pdf");
+  const line = (text: string) => `[...document.querySelectorAll('#viewer .edit-target')].find(l => l.dataset.text.includes(${JSON.stringify(text)}))`;
+  const editLine = async (find: string, replace: string) => {
+    await waitFor(`!!${line(find)}`, `an editable line with "${find}"`, 30_000);
+    await js(`${line(find)}.querySelector('.edit-rect').click()`);
+    await waitFor("document.activeElement?.classList.contains('edit-input')", "the text box");
+    await js("document.activeElement.select()");
+    await cdp.send("Input.insertText", { text: replace });
+    await press("Enter");
+  };
+  const disk = () => Bun.file(paper).text();
+  const onDisk = (want: string) =>
+    until(async () => (await disk()).includes(want), 10_000, `"${want}" on disk`).catch(async (e) => {
+      throw new Error(`${(e as Error).message}; on disk: ${JSON.stringify(await disk())}`);
+    });
+
+  await editLine("quick brown fox", "The quick red fox jumps over the lazy cat, 100% sure.");
+  await onDisk("The quick red fox jumps over the lazy cat, 100\\% sure.\n");
+  await waitFor(`!!${line("quick red fox")}`, "the page redrawn with the edit", 30_000);
+  // A macro's arguments are separate components: the title and the place are edited on their own.
+  expect(await js<boolean>(`${line("Acme")}.dataset.text === "Acme"`), "the place shares a target with the title");
+  await editLine("Acme", "Initech");
+  await onDisk("\\job{Engineer}{Initech}");
+  await waitFor(`!!${line("Initech")}`, "redrawn", 30_000);
+  await editLine("Engineer", "Senior Engineer");
+  await onDisk("\\job{Senior Engineer}{Initech}");
+  await waitFor(`!!${line("Senior")}`, "redrawn", 30_000);
+  // Inside \textbf: only the words change.
+  await editLine("bold words", "Some bold text here.");
+  await onDisk("Some \\textbf{bold text} here.");
+  await waitFor(`!!${line("bold text")}`, "redrawn", 30_000);
+  // Joining words across the end of \textbf would cut through it: refused, nothing written.
+  const before = await disk();
+  await editLine("bold text", "Some bold texthere.");
+  await waitFor("/formatting/.test(document.getElementById('toast').textContent)", "explains why it didn't change");
+  expect((await disk()) === before, "the file changed anyway");
+  // A paragraph that wraps is one target, over both of its lines.
+  expect(await js<boolean>(`${line("zebra")}.querySelectorAll('.edit-rect').length >= 2`), "the wrapped paragraph isn't one target over two lines");
+  await editLine(
+    "zebra",
+    "This paragraph is long enough to wrap onto a second printed line of the page, so one component covers two lines and is edited as a single target that ends with giraffe.",
+  );
+  await onDisk("ends with giraffe.\n");
+  expect((await disk()).includes("\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}"), "the macro definition changed");
   // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
   await press("p", [MOD]);
   await waitFor("!document.getElementById('palette').hidden", "palette");

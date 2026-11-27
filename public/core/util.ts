@@ -11,7 +11,6 @@ export const STORED = {
   showAgentFiles: "show-agent-files",
   versionStrip: "version-strip", // version bar shown
   middle: "middle", // the middle column shows "claude" or "source"
-  previewView: "preview-view", // LaTeX documents show "visual" (the default) or "pdf"
   // Panes shown ("1"/"0"), keyed by the pane's element id.
   treePane: "tree-pane",
   claudePane: "claude-pane",

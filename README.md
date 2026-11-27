@@ -70,8 +70,8 @@ Click a folder to expand it, and click a file to open it:
 
 | File | What happens |
 |---|---|
-| `.tex` with `\documentclass` | Opens in the Visual editor; compiles live, with the PDF a click away, errors in **Logs**, page count, and **Save PDF** |
-| `.tex` without it (`\input` fragments) | Opens in the Visual editor (and Source). Saving it rebuilds whichever document you have open. |
+| `.tex` with `\documentclass` | Compiles and previews live; its text can be edited on the page, its LaTeX in Source. Errors in **Logs**, page count, and **Save PDF** |
+| `.tex` without it (`\input` fragments) | Opens in the editor. Saving it rebuilds whichever document you have open (and its text can be edited on that document's page). |
 | `.pdf` | Rendered |
 | images | Shown as-is |
 | `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Opens in the editor |
@@ -135,17 +135,13 @@ History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF
 
 ### Editing
 
-A LaTeX file opens in the **Visual** editor: the document as you'd read it, editable. Headings look like headings, `\textbf` is bold, math is typeset (KaTeX), lists have bullets, citations and references are small chips, figures show their images, and the preamble folds into one "document settings" line. Type as you would in a word processor: Enter starts a new paragraph (or a new list item), and characters that mean something to LaTeX (`%`, `&`, `#`, `_`, `$`) are written so they print as typed. The toolbar (and `⌘B`, `⌘I`, `⌘M`) adds bold, italics, headings, lists, math, and citations.
+**On the page.** The preview is your compiled PDF, and its text can be edited where it stands. Hover to see what can be changed: a heading, a job title, a date, a whole bullet, a paragraph, each outlined on every line it covers. Click it and it becomes a text box right on the page. Type, then press Enter (or click away; Esc cancels). underleaf writes the change into your LaTeX at exactly the words that printed it, leaving the commands around them alone and escaping characters LaTeX treats specially (`%`, `&`, `$`…); a change that would cut through formatting (say, joining a bold word with the next) is refused rather than written, and the page redraws with the result a moment later. Because the page is TeX's own output, what you edit is exactly what you'll send.
 
-Nothing is converted: the Visual editor shows the LaTeX file itself with the markup hidden. Where your cursor is, that piece shows its LaTeX so you can edit it, and renders again when you move on. Anything it doesn't know (a class's own macros, tables) stays as written, never guessed at.
+What can be edited on the page is the text your source spells out: paragraphs, headings, list items, the arguments of your own macros (a resume's titles, dates, bullets). Bullets, icons, page numbers, math and text a macro generates aren't, and structure (a new section, a new item) isn't either: that's for Source.
 
-- **PDF**: the **Visual | PDF** switch in the preview shows the compiled document (exact layout, page breaks, page count). Your choice is remembered.
-- **Source**: the raw LaTeX, in the middle column where Claude is (**Claude | Source**, or press `e`). Both editors show the same text, so typing in one updates the other at once.
-- Other text files (`.bib`, notes) open in a plain editor in the preview.
+**Source.** The raw LaTeX, in the middle column where Claude is (**Claude | Source**, or press `e`). Other text files (`\input` chapters, `.bib`, notes) open in the editor in the preview.
 
-There's no save button to remember: edits are saved a moment after you stop typing (`⌘S` in an editor saves at once; elsewhere it saves the PDF). Each save rebuilds the document and lands in version history as "You edited".
-
-If Claude changes the file you're editing, the editors take the new version when you have nothing unsaved. If you do, they ask: **Use the version on disk** or **Keep mine**. Nothing is overwritten without asking.
+Both save the same way: edits are saved a moment after you stop typing (`⌘S` in the editor saves at once; elsewhere it saves the PDF), each save rebuilds the document and lands in version history as "You edited". If Claude changes the file you're editing in Source, it takes the new version when you have nothing unsaved; if you do, it asks: **Use the version on disk** or **Keep mine**.
 
 ### Keyboard
 
@@ -157,7 +153,6 @@ Press `?` (or the **?** button) for the full list. The essentials:
 | `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
 | `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…); in the editor, save the file |
 | `e` | Show the open file's LaTeX (Source) in the middle column, or Claude again |
-| `⌘B` / `⌘I` / `⌘M` | In the Visual editor: bold, italics, math |
 | `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
 | `Ctrl+Space` then `z` | Zoom the focused pane |
 
