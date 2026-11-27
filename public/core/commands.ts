@@ -112,8 +112,8 @@ export const COMMANDS: Command[] = [
   { id: "copy-path", title: "Copy path of open file", run: () => copyPath(state.selected), when: () => !!state.selected },
   { title: "Compare with current version", run: () => versions.viewing && compareVersions(versions.viewing, null), when: () => !!versions.viewing && !diffView.active },
   { id: "compare-file", title: "Compare with another file…", run: compareWithFile, when: canCompare },
-  { title: "Show agent memory", run: () => toggleAgentFiles(true), when: () => !tree.agentFilesVisible },
-  { title: "Hide agent memory", run: () => toggleAgentFiles(false), when: () => tree.agentFilesVisible },
+  { title: "Show Claude's files (instructions and memory)", run: () => toggleAgentFiles(true), when: () => !tree.agentFilesVisible },
+  { title: "Hide Claude's files", run: () => toggleAgentFiles(false), when: () => tree.agentFilesVisible },
   {
     title: "Reveal open file in tree",
     run: () => {

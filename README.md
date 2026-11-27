@@ -108,7 +108,7 @@ underleaf hands Claude its instructions when it starts Claude in the folder, so 
 
 For a resume workspace, ask Claude on first use to build your experience bank from your existing resumes.
 
-`CLAUDE.md` and `memory/` are hidden from the file tree by default. Run **Show agent memory** from the command palette (⌘⇧P) to see or edit what Claude remembers.
+`CLAUDE.md` and `memory/` are hidden from the file tree by default. Click **Show** under the file tree (or run **Show Claude's files** from the command palette) (⌘⇧P) to see or edit what Claude remembers.
 
 ### Version history
 
@@ -135,7 +135,9 @@ History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF
 
 ### Editing
 
-**On the page.** The preview is your compiled PDF, and its text can be edited where it stands. Hover to see what can be changed: a heading, a job title, a date, a whole bullet, a paragraph, each outlined on every line it covers. Click it and it becomes a text box right on the page. Type, then press Enter (or click away; Esc cancels). underleaf writes the change into your LaTeX at exactly the words that printed it, leaving the commands around them alone and escaping characters LaTeX treats specially (`%`, `&`, `$`…); a change that would cut through formatting (say, joining a bold word with the next) is refused rather than written, and the page redraws with the result a moment later. Because the page is TeX's own output, what you edit is exactly what you'll send.
+**On the page.** The preview is your compiled PDF, and its text can be edited where it stands. Hover to see what can be changed: a heading, a job title, a date, a whole bullet, a paragraph, each part of a line split by separators (`Boston | phone | email`), each outlined on every line it covers. Click it and it becomes a text box right on the page. Type, then press Enter (or click away; Esc cancels). underleaf writes the change into your LaTeX at exactly the words that printed it, leaving the commands around them alone and escaping characters LaTeX treats specially (`%`, `&`, `$`…); a change that would cut through formatting (say, joining a bold word with the next) is refused rather than written, and the page redraws with the result a moment later. Because the page is TeX's own output, what you edit is exactly what you'll send.
+
+A part with a link (`\href`) also shows its address under the text box (just the email for a `mailto:` link), so you can fix a URL without touching the LaTeX.
 
 What can be edited on the page is the text your source spells out: paragraphs, headings, list items, the arguments of your own macros (a resume's titles, dates, bullets). Bullets, icons, page numbers, math and text a macro generates aren't, and structure (a new section, a new item) isn't either: that's for Source.
 

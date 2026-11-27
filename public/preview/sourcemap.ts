@@ -21,7 +21,9 @@ import type { Word } from "../compare/diffcore";
  * between blank lines, \items, \\ and environment boundaries. Inline formatting (\textbf, \emph,
  * \href, sizes) stays part of the surrounding component.
  */
-export type SourceWord = { key: string; file: string; from: number; to: number; component: string };
+export type SourceWord = { key: string; file: string; from: number; to: number; component: string; link?: Link };
+/** Where a link's URL is in the source (inside \href{…}): words in the link's text carry it, so it can be edited too. */
+export type Link = { from: number; to: number };
 /** A source file as it was when the map was made: edits are worked out against this text. */
 export type SourceFile = { path: string; text: string };
 export type SourceMap = { files: Map<string, SourceFile>; source: SourceWord[]; at: (pageWord: number) => SourceWord | null };
@@ -43,7 +45,14 @@ const HIDDEN_ARG = new Set([
   "fontsize", "linespread", "geometry", "newlength", "input", "include", "raisebox", "rule", "phantom",
 ]);
 /** Commands that print a word. */
-const WORDS: Record<string, string> = { LaTeX: "LaTeX", TeX: "TeX", LaTeXe: "LaTeX2ε", ldots: "…", dots: "…", textendash: "–", textemdash: "—", textbar: "|", textbackslash: "\\" };
+const WORDS: Record<string, string> = { LaTeX: "LaTeX", TeX: "TeX", LaTeXe: "LaTeX2ε", ldots: "…", dots: "…", textendash: "–", textemdash: "—", textbackslash: "\\" };
+/**
+ * What visibly separates parts of a line (a location | a phone number | an email): spacing commands, a
+ * \textbar, or math that's only a separator symbol. They split a component into parts edited on their
+ * own. Real math in a sentence ("for $n$ users") doesn't.
+ */
+const SPACERS = new Set(["hfill", "hfil", "quad", "qquad", "enspace", "hspace", "hskip", "textbar"]);
+const SEPARATOR_MATH = /^\s*(?:[|/·•,;:\-*]|\\(?:cdot|bullet|vert|mid|diamond|star|circ|ast|cdotp|textbullet|bigcdot|Vert|lvert|rvert))\s*$/;
 const MATH_ENVS = /^(equation|align|gather|multline|displaymath|math)\*?$/;
 /** Commands whose argument is formatting inside a sentence, not a component of its own. */
 const INLINE = new Set([
@@ -54,7 +63,7 @@ const INLINE = new Set([
 /** Commands after which a new stretch of text (component) starts. */
 const BREAKS = new Set(["item", "par", "newline", "linebreak", "begin", "end", "section", "subsection", "subsubsection", "chapter", "paragraph", "part"]);
 
-type Char = { ch: string; from: number; to: number; comp: string };
+type Char = { ch: string; from: number; to: number; comp: string; link?: Link };
 
 /** Read one file's visible text. `include(name, at)` reads an \input / \include file in place. */
 async function project(file: string, text: string, out: SourceWord[], include: (name: string) => Promise<void>, isMain: boolean) {
@@ -62,7 +71,7 @@ async function project(file: string, text: string, out: SourceWord[], include: (
   const flush = () => {
     let word: Char[] = [];
     const end = () => {
-      if (word.length) out.push({ key: keyOf(word.map((c) => c.ch).join("")), file, from: word[0]!.from, to: word.at(-1)!.to, component: word[0]!.comp });
+      if (word.length) out.push({ key: keyOf(word.map((c) => c.ch).join("")), file, from: word[0]!.from, to: word.at(-1)!.to, component: word[0]!.comp, link: word[0]!.link });
       word = [];
     };
     for (const c of chars) (/\s/.test(c.ch) ? end() : word.push(c));
@@ -73,16 +82,22 @@ async function project(file: string, text: string, out: SourceWord[], include: (
 
   // Components: brace groups that are a command's argument (and not inline formatting) are their own;
   // other text belongs to the stretch that started at `seg`.
-  const groups: { start: number; owner: string | null; component: boolean }[] = [];
+  // A separator inside an argument splits it into parts (`sub`); at the top level it starts a new stretch.
+  const groups: { start: number; owner: string | null; component: boolean; sub: number; link?: Link }[] = [];
   const owners = new Map<number, string>(); // "{" offset → the command it's an argument of
+  const links = new Map<number, Link>(); // "{" offset of an \href's text → where its URL is
   let seg = 0;
+  const innermost = () => groups.findLast((g) => g.component);
   const comp = () => {
-    for (let k = groups.length - 1; k >= 0; k--) if (groups[k]!.component) return `${file}#g${groups[k]!.start}`;
-    return `${file}#s${seg}`;
+    const g = innermost();
+    return g ? `${file}#g${g.start}.${g.sub}` : `${file}#s${seg}`;
   };
-  const emit = (ch: string, from: number, to: number) => chars.push({ ch, from, to, comp: comp() });
+  const link = () => groups.findLast((g) => g.link)?.link;
+  const emit = (ch: string, from: number, to: number) => chars.push({ ch, from, to, comp: comp(), link: link() });
   const breakAt = (at: number) => {
-    if (!groups.some((g) => g.component)) seg = at;
+    const g = innermost();
+    if (g) g.sub = at;
+    else seg = at;
   };
 
   let i = 0;
@@ -117,6 +132,7 @@ async function project(file: string, text: string, out: SourceWord[], include: (
       if (c === "$") {
         const display = text[i + 1] === "$";
         const close = text.indexOf(display ? "$$" : "$", i + (display ? 2 : 1));
+        if (close > 0 && SEPARATOR_MATH.test(text.slice(i + (display ? 2 : 1), close))) breakAt(i); // $|$ between parts of a line
         space(i);
         i = close < 0 ? stop : close + (display ? 2 : 1); // math isn't edited on the page
         space(i);
@@ -124,7 +140,7 @@ async function project(file: string, text: string, out: SourceWord[], include: (
       }
       if (c === "{") {
         const owner = owners.get(i) ?? null;
-        groups.push({ start: i, owner, component: !!owner && !INLINE.has(owner) });
+        groups.push({ start: i, owner, component: !!owner && !INLINE.has(owner), sub: i, link: links.get(i) });
         i++;
         continue;
       }
@@ -221,7 +237,7 @@ async function project(file: string, text: string, out: SourceWord[], include: (
         continue;
       }
       if (name === "item") space(i);
-      if (BREAKS.has(name)) breakAt(i);
+      if (BREAKS.has(name) || SPACERS.has(name)) breakAt(i);
       // Optional arguments ([…]) never print here; a hidden argument is skipped whole.
       while (text[j] === "[") {
         const close = text.indexOf("]", j);
@@ -230,7 +246,14 @@ async function project(file: string, text: string, out: SourceWord[], include: (
       }
       if (HIDDEN_ARG.has(name) && text[j] === "{") {
         const close = matchBrace(text, j);
-        if (close > 0) j = close;
+        if (close > 0) {
+          // \href{URL}{text}: the text that follows remembers where its URL is.
+          if (name === "href") {
+            const textArg = argAfter(text, close);
+            if (textArg >= 0) links.set(textArg, { from: j + 1, to: close - 1 });
+          }
+          j = close;
+        }
       }
       const arg = argAfter(text, j);
       if (arg >= 0) owners.set(arg, name); // the brace group that follows is this command's argument

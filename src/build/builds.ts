@@ -44,7 +44,12 @@ export function resetBuilds() {
 // The last successful PDF is kept separately so a broken build never blanks the preview.
 export const goodPdfOf = (doc: string) => path.join(outDirOf(doc), "underleaf-latest.pdf");
 
+/** Build a document (queued behind a build already running). Never throws: a failure is logged, not fatal. */
 export async function build(doc: string) {
+  await buildQueued(doc).catch((e) => console.error(`build of ${doc} failed: ${(e as Error).message}`));
+}
+
+async function buildQueued(doc: string) {
   const s = stateOf(doc);
   if (s.compiling) {
     s.queued = true;

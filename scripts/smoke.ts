@@ -232,7 +232,7 @@ await check("guardrails merge: the user's own rules stay, rules underleaf droppe
 });
 
 await check("agent files: hidden by default, one click shows them", async () => {
-  await waitFor("/\\d+ agent files hidden/.test(document.getElementById('tree-foot').textContent)", "the hidden-files line");
+  await waitFor("/\\d+ of Claude's files hidden/.test(document.getElementById('tree-foot').textContent)", "the hidden-files line");
   await click("#agent-toggle");
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'CLAUDE.md')", "CLAUDE.md listed");
   await click("#agent-toggle");
@@ -342,7 +342,7 @@ await check("quick open (mod+P) lists files and opens one", async () => {
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "notes" });
   await press("Enter");
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md'", "notes.md open");
 });
 
 await check("? opens the cheat sheet with every section", async () => {
@@ -391,7 +391,7 @@ await check("saving after a change leaves a new marker", async () => {
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "main.tex" });
   await press("Enter");
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
   await press("s", [MOD]);
   const saveMarkers = async () =>
     ((await (await fetch(`http://localhost:${port}${url(API.history, { path: "latex/main.tex" })}`)).json()) as { snapshots: { label: string }[] }).snapshots.filter((s) => s.label === "Saved as draft.pdf").length;
@@ -413,7 +413,7 @@ await check("won't save while the latest build has failed (the PDF would be olde
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "notes" });
   await press("Enter");
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md'", "notes.md open");
 });
 
 const openFolder = (dir: string) =>
@@ -451,7 +451,7 @@ const typeInEditor = async (text: string) => {
 };
 
 await check("text files open in the editor; typing saves the file on its own", async () => {
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md' && document.getElementById('preview-body').dataset.editor === 'full'", "notes.md in the editor");
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md' && document.getElementById('preview-body').dataset.editor === 'full'", "notes.md in the editor");
   await waitFor("document.querySelector('#editor .cm-content')?.innerText.includes('first')", "its text");
   await typeInEditor("typed in the editor\n");
   await until(async () => (await Bun.file(notes).text()).startsWith("typed in the editor\n"), 10_000, "the edit on disk");
@@ -482,7 +482,7 @@ await check("e shows a document's LaTeX in the middle column; ⌘S there saves t
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "main.tex" });
   await press("Enter");
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
   await focusPreview();
   await press("e");
   await waitFor("document.getElementById('claude-pane').dataset.mid === 'source' && document.querySelector('#source .cm-content')?.innerText.includes('documentclass')", "Source in the middle column", 10_000);
@@ -502,10 +502,11 @@ await check("editing on the page: components (a title, a place, a paragraph) edi
   const paper = path.join(latex, "paper.tex");
   await Bun.write(
     paper,
-    "\\documentclass{article}\n\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}\n\\begin{document}\n\\section{Intro}\n" +
+    "\\documentclass{article}\n\\usepackage{hyperref}\n\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}\n\\begin{document}\n\\section{Intro}\n" +
       "The quick brown fox jumps over the lazy dog.\n\n\\job{Engineer}{Acme}\n\nSome \\textbf{bold words} here.\n\n" +
       "This paragraph is long enough to wrap onto a second printed line of the page, so one component covers two lines " +
-      "and is edited as a single target that ends with zebra.\n\\end{document}\n",
+      "and is edited as a single target that ends with zebra.\n\n" +
+      "Boston $|$ \\href{https://example.com/}{example.com} $|$ \\href{mailto:me@example.com}{me@example.com}\n\\end{document}\n",
   );
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'paper.tex')", "paper.tex listed", 10_000);
   await press("p", [MOD]);
@@ -554,13 +555,28 @@ await check("editing on the page: components (a title, a place, a paragraph) edi
     "This paragraph is long enough to wrap onto a second printed line of the page, so one component covers two lines and is edited as a single target that ends with giraffe.",
   );
   await onDisk("ends with giraffe.\n");
+  // Separators ($|$) split a line into parts; a link's address is edited in the field under the text box.
+  await waitFor(`!!${line("giraffe")} && !document.querySelector('.edit-input')`, "redrawn", 30_000);
+  expect(await js<boolean>(`${line("Boston")}.dataset.text === "Boston"`), "$|$ didn't split the line into parts");
+  const relink = async (find: string, address: string) => {
+    await js(`${line(find)}.querySelector('.edit-rect').click()`);
+    await waitFor("!!document.querySelector('.edit-links input')", "the link field");
+    await js(`(() => { const f = document.querySelector('.edit-links input'); f.focus(); f.select(); })()`);
+    await cdp.send("Input.insertText", { text: address });
+    await press("Enter");
+  };
+  await relink("example.com", "https://example.org/");
+  await onDisk("\\href{https://example.org/}{example.com}");
+  await waitFor(`!!${line("me@example.com")} && !document.querySelector('.edit-links')`, "redrawn", 30_000);
+  await relink("me@example.com", "you@example.com");
+  await onDisk("\\href{mailto:you@example.com}{me@example.com}");
   expect((await disk()).includes("\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}"), "the macro definition changed");
   // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
   await press("p", [MOD]);
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "notes" });
   await press("Enter");
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md'", "notes.md open");
 });
 
 await check("switching workspaces swaps the files, the title and Claude's folder", async () => {
@@ -576,7 +592,7 @@ await check("switching back from the title bar restores that workspace's history
   await waitFor("[...document.querySelectorAll('.menu li .label')].some(l => l.textContent === 'latex')", "recent workspaces listed");
   await js("[...document.querySelectorAll('.menu li')].find(li => li.querySelector('.label')?.textContent === 'latex').click()");
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'main.tex')", "back in the first workspace", 20_000);
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "its last open file (notes.md) reopened");
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md'", "its last open file (notes.md) reopened");
 });
 
 await check("a copied folder gets its own id and history, starting from the original's", async () => {
@@ -597,7 +613,7 @@ await check("an empty folder offers the templates; starting one fills it and giv
   expect((await openFolder(fresh)).status === 200, "couldn't open the folder");
   await waitFor("document.querySelectorAll('.template-card').length === 4", "four template cards", 20_000);
   await click(".template-card[data-template='thesis']");
-  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex open and built", 30_000);
+  await waitFor("document.getElementById('preview-title').dataset.path === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex open and built", 30_000);
   for (const f of ["chapters/introduction.tex", "references.bib", ".claude/skills/check-citations/SKILL.md", ".claude/skills/consistent-terminology/SKILL.md"]) {
     expect(await Bun.file(path.join(fresh, f)).exists(), `${f} wasn't copied`);
   }
