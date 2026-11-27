@@ -2,7 +2,7 @@ import path from "node:path";
 import { realpath, stat } from "node:fs/promises";
 import { HOME } from "../home";
 
-/** Folders you've opened in underleaf, most recent first, in ~/.underleaf/workspaces.json. */
+/** Projects (and, in developer mode, folders) you've opened, most recent first, in <app data>/workspaces.json. */
 
 type Entry = { dir: string; openedAt: number };
 const FILE = path.join(HOME, "workspaces.json");

@@ -91,6 +91,12 @@
   box-shadow: var(--shadow-pop);
   overflow: hidden;
 }
+/* One line of text (a project's name). */
+.ask { width: min(420px, 100%); padding: 16px; display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-pop); }
+.ask h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.ask input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--chrome); color: var(--ink); font: 14px var(--ui); }
+.ask input:focus { outline: 2px solid var(--leaf); outline-offset: -1px; }
+.ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .palette input {
   width: 100%;
   padding: 14px 16px;

@@ -3,7 +3,8 @@ import path from "node:path";
 import index from "../../public/index.html";
 import { REPO } from "../repo";
 import { PORT } from "./config";
-import { current, startFromTemplate, tryOpenWorkspace, workspaceMessage } from "./workspace";
+import { current, importFolder, newProject, renameCurrent, startFromTemplate, tryOpenWorkspace, workspaceMessage } from "./workspace";
+import { reveal } from "../workspace/library";
 import { isEmptyWorkspace, listTemplates } from "../workspace/templates";
 import { pickFolder } from "../workspace/pick";
 import { build, compiledMessage, goodPdfOf, isStale, relDoc, stateOf } from "../build/builds";
@@ -19,6 +20,8 @@ import {
   SOCKETS,
   type ClaudeClientMessage,
   type ClientMessage,
+  type ImportRequest,
+  type NewProjectRequest,
   type OpenWorkspaceRequest,
   type OpenWorkspaceResponse,
   type PickFolderResponse,
@@ -254,18 +257,49 @@ export function startServer() {
         },
       },
 
-      [API.workspacePick]: {
+      [API.projectNew]: {
+        POST: async (req: Request) => {
+          if (!trusted(req)) return forbidden();
+          const { name } = (await req.json().catch(() => ({}))) as Partial<NewProjectRequest>;
+          const problem = await newProject(name);
+          if (problem) return Response.json({ error: problem } satisfies OpenWorkspaceResponse, { status: 400 });
+          return Response.json({ ok: true } satisfies OpenWorkspaceResponse);
+        },
+      },
+
+      [API.projectRename]: {
+        POST: async (req: Request) => {
+          if (!trusted(req)) return forbidden();
+          const { name } = (await req.json().catch(() => ({}))) as Partial<NewProjectRequest>;
+          const problem = await renameCurrent(name);
+          if (problem) return Response.json({ error: problem } satisfies OpenWorkspaceResponse, { status: 400 });
+          return Response.json({ ok: true } satisfies OpenWorkspaceResponse);
+        },
+      },
+
+      [API.projectImport]: {
         POST: async (req: Request, server: Server<WsData>) => {
           if (!trusted(req)) return forbidden();
-          server.timeout(req, 0); // the dialog stays open as long as you browse; Bun would cut the request at 10 s
-          const choice = await pickFolder();
-          if (choice === null) return Response.json({ cancelled: true } satisfies PickFolderResponse);
-          if (choice === "unsupported") {
-            return Response.json({ error: "No folder dialog on this system. Start underleaf with the folder instead: bun dev <folder>" } satisfies PickFolderResponse, { status: 501 });
+          const { dir } = (await req.json().catch(() => ({}))) as Partial<ImportRequest>;
+          let source = typeof dir === "string" && dir ? path.resolve(dir) : null;
+          if (!source) {
+            server.timeout(req, 0); // the dialog stays open as long as you browse; Bun would cut the request at 10 s
+            const choice = await pickFolder();
+            if (choice === null) return Response.json({ cancelled: true } satisfies PickFolderResponse);
+            if (choice === "unsupported") return Response.json({ error: "No folder dialog on this system." } satisfies PickFolderResponse, { status: 501 });
+            source = choice;
           }
-          const problem = await tryOpenWorkspace(choice);
+          const problem = await importFolder(source);
           if (problem) return Response.json({ error: problem } satisfies PickFolderResponse, { status: 400 });
-          return Response.json({ ok: true, dir: choice } satisfies PickFolderResponse);
+          return Response.json({ ok: true, dir: current().dir } satisfies PickFolderResponse);
+        },
+      },
+
+      [API.projectReveal]: {
+        POST: (req: Request) => {
+          if (!trusted(req)) return forbidden();
+          reveal(current().dir);
+          return Response.json({ ok: true } satisfies OpenWorkspaceResponse);
         },
       },
     },

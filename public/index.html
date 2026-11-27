@@ -12,7 +12,7 @@
       <div class="tb-left">
         <span class="brand">under<i>leaf</i></span>
         <button id="workspace-btn" class="workspace-btn" aria-haspopup="listbox" aria-label="Workspace">
-          <span class="ws-name"></span><span class="ws-path"></span><span class="chev">▾</span>
+          <span class="ws-name"></span><span class="chev">▾</span>
         </button>
         <span id="connection" class="connection" hidden>Disconnected. Is <code>bun dev</code> running?</span>
       </div>
@@ -59,9 +59,8 @@
         <div class="pane-head">
           <div class="seg pane-tabs" role="tablist" aria-label="Middle column">
             <button id="tab-claude" role="tab">Claude</button>
-            <button id="tab-source" role="tab" data-key="e">Source</button>
+            <button id="tab-source" role="tab" data-key="e">LaTeX</button>
           </div>
-          <span class="hint claude-only">in <code id="claude-where"></code></span>
           <span class="spacer"></span>
           <span class="editor-state source-only" role="status"></span>
         </div>
@@ -189,6 +188,17 @@
         </div>
       </section>
     </main>
+
+    <div id="ask" class="overlay" hidden>
+      <form id="ask-form" class="ask" role="dialog" aria-labelledby="ask-title">
+        <h2 id="ask-title"></h2>
+        <input id="ask-input" autocomplete="off" spellcheck="false" maxlength="60" aria-labelledby="ask-title" />
+        <div class="ask-actions">
+          <button type="button" id="ask-cancel" class="ghost">Cancel</button>
+          <button type="submit" id="ask-ok" class="primary"></button>
+        </div>
+      </form>
+    </div>
 
     <div id="palette" class="overlay" hidden>
       <div class="palette" role="dialog" aria-label="Quick open">

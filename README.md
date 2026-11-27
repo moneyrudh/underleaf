@@ -35,24 +35,23 @@ If `doctor` can't find LaTeX:
 ## Usage
 
 ```sh
-bun dev                       # opens http://localhost:4747 on the folder you had open last
-bun dev ~/Documents/thesis    # opens a specific folder
-bun dev examples              # try the bundled example
-bun run new ~/thesis --template thesis   # start a folder from a template
+bun dev                       # opens http://localhost:4747 on the project you had open last
+bun dev examples              # developer mode: open a folder directly (here, the bundled example)
+bun run new My Thesis --template thesis  # a new project from a template
 bun run pdf latex/main.tex    # one-off export from the terminal
 ```
 
-Options: `bun dev [folder] [--port N] [--no-open]`.
+Options: `bun dev [folder] [--port N] [--no-open]`. A folder on the command line opens it directly (developer mode); otherwise underleaf opens its library.
 
-### Workspaces
+### Projects
 
-A workspace is one folder of documents: a thesis, a set of resumes, a paper. Each has its own files, version history, and Claude conversation, so a thesis and a resume never share instructions or memory.
+A project is one document or set of documents: a thesis, your resumes, a paper. Each has its own files, version history, and Claude conversation, so a thesis and a resume never share instructions or memory.
 
-The folder name in the title bar switches between workspaces you've opened, and **Open folder…** opens another one with your system's folder dialog (also in the command palette, along with **Switch workspace…**). Switching swaps the file tree, the history and Claude's folder; Claude picks up that folder's last conversation. underleaf adds two small things to a folder you open: `.underleaf/` (the history id and a status file for Claude) and, in `.claude/settings.json`, its hooks and the permission rules described under [Security](#security).
+underleaf keeps your projects itself, so you never pick folders. The project name in the title bar opens the project menu: switch projects, **New project…** (name it, then choose a template), **Rename…**, **Import folder…** (copies an existing LaTeX project in; the original isn't touched), and **Show files in Finder** for anyone who wants to see the LaTeX files. The PDFs you send are saved wherever you choose (see below).
 
-With no folder given, a fresh checkout uses its own `latex/` folder, which is git-ignored so personal files never end up in this repo.
+Everything underleaf manages lives in one folder, the operating system's place for app data: `~/Library/Application Support/underleaf` on macOS, `%APPDATA%\underleaf` on Windows, `~/.local/share/underleaf` on Linux. Inside are `projects/`, their version `history/`, and the `build/` cache.
 
-A folder with no `.tex` files opens on a template picker: **Resume**, **Thesis**, **Article**, or **Blank**. `bun run new <folder> --template <name>` does the same from the terminal. A template only fills an empty folder and never overwrites a file that's already there.
+A new (empty) project opens on a template picker: **Resume**, **Thesis**, **Article**, or **Blank**. `bun run new <name> --template <name>` does the same from the terminal. A template only fills an empty folder and never overwrites a file that's already there.
 
 ### Saving PDFs
 
@@ -108,7 +107,7 @@ underleaf hands Claude its instructions when it starts Claude in the folder, so 
 
 For a resume workspace, ask Claude on first use to build your experience bank from your existing resumes.
 
-`CLAUDE.md` and `memory/` are hidden from the file tree by default. Run **Show agent memory** from the command palette (⌘⇧P) to see or edit what Claude remembers.
+`CLAUDE.md` and `memory/` are hidden from the file tree by default. Click **Show** under the file tree (or run **Show Claude's files** from the command palette) (⌘⇧P) to see or edit what Claude remembers.
 
 ### Version history
 
@@ -131,11 +130,13 @@ Press `C` in the preview to see what changed since the previous version of the o
 
 Pick either side from the two menus. While comparing, the version bar and `,`/`.` move the "before" side. `]c`/`[c` jump between changes, and `Esc` (or **Done**) goes back. If the current version is one side, the comparison updates live as you or Claude edit.
 
-History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
+History is stored in underleaf's data folder (`history/`), not in your project (set `UNDERLEAF_HOME` to move the whole data folder). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
 
 ### Editing
 
-**On the page.** The preview is your compiled PDF, and its text can be edited where it stands. Hover to see what can be changed: a heading, a job title, a date, a whole bullet, a paragraph, each outlined on every line it covers. Click it and it becomes a text box right on the page. Type, then press Enter (or click away; Esc cancels). underleaf writes the change into your LaTeX at exactly the words that printed it, leaving the commands around them alone and escaping characters LaTeX treats specially (`%`, `&`, `$`…); a change that would cut through formatting (say, joining a bold word with the next) is refused rather than written, and the page redraws with the result a moment later. Because the page is TeX's own output, what you edit is exactly what you'll send.
+**On the page.** The preview is your compiled PDF, and its text can be edited where it stands. Hover to see what can be changed: a heading, a job title, a date, a whole bullet, a paragraph, each part of a line split by separators (`Boston | phone | email`), each outlined on every line it covers. Click it and it becomes a text box right on the page. Type, then press Enter (or click away; Esc cancels). underleaf writes the change into your LaTeX at exactly the words that printed it, leaving the commands around them alone and escaping characters LaTeX treats specially (`%`, `&`, `$`…); a change that would cut through formatting (say, joining a bold word with the next) is refused rather than written, and the page redraws with the result a moment later. Because the page is TeX's own output, what you edit is exactly what you'll send.
+
+A part with a link (`\href`) also shows its address under the text box (just the email for a `mailto:` link), so you can fix a URL without touching the LaTeX.
 
 What can be edited on the page is the text your source spells out: paragraphs, headings, list items, the arguments of your own macros (a resume's titles, dates, bullets). Bullets, icons, page numbers, math and text a macro generates aren't, and structure (a new section, a new item) isn't either: that's for Source.
 

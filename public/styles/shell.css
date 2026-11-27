@@ -13,10 +13,10 @@
 .tb-left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .brand { font-weight: 500; font-size: 14px; letter-spacing: 0.01em; white-space: nowrap; }
 .brand i { font: italic 500 1.16em var(--tex); color: var(--leaf); }
-/* The open workspace: its name, its path, and a menu to switch. */
+/* The open workspace: its name, and a menu to switch. */
 .workspace-btn {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 7px;
   min-width: 0;
   height: 26px;
@@ -27,7 +27,6 @@
 }
 .workspace-btn:hover, .workspace-btn[aria-expanded="true"] { background: var(--sunken); }
 .workspace-btn .ws-name { font-weight: 500; }
-.workspace-btn .ws-path { font: 11.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .workspace-btn .chev { font-size: 10px; color: var(--muted); }
 .tb-left { align-items: center; }
 .connection { color: var(--error); font-size: 12px; white-space: nowrap; }

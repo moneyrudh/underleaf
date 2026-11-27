@@ -3,7 +3,8 @@ import path from "node:path";
 import { access, constants, mkdir, realpath, stat } from "node:fs/promises";
 import { DEFAULT_DIR, PORT } from "./config";
 import { REPO } from "../repo";
-import { HOME } from "../home";
+import { BUILD, HOME } from "../home";
+import { cleanName, copyIntoLibrary, createProject, inLibrary, listProjects, nameOf, renameProject } from "../workspace/library";
 import { broadcast, claude } from "./clients";
 import { resetBuilds } from "../build/builds";
 import { closeHistory, flushEditSnapshot, openHistory } from "../history/snapshots";
@@ -55,7 +56,7 @@ export async function unusable(dir: string): Promise<string | null> {
   // Inside the checkout only its own documents folder and the examples work: anything else is
   // underleaf's source or templates, and opening it would write ids and hooks into committed files.
   const allowed = [await canonical(DEFAULT_DIR), path.join(repo, "examples")];
-  if ((inside(repo) && !allowed.includes(dir)) || inside(own)) return "That's underleaf's own folder. Pick a folder for your documents.";
+  if ((inside(repo) && !allowed.includes(dir)) || (inside(own) && !inLibrary(dir))) return "That's underleaf's own folder. Pick a folder for your documents.";
   return null;
 }
 
@@ -96,7 +97,7 @@ async function open(dir: string) {
   }
   generation++;
 
-  active = { dir, id, name: path.basename(dir), build: path.join(REPO, "build", id), roots: { latex: dir } };
+  active = { dir, id, name: await nameOf(dir), build: path.join(BUILD, id), roots: { latex: dir } };
   await openHistory(dir);
   await startWatching(dir, isDefault);
   await rescan();
@@ -149,6 +150,8 @@ async function fillFromTemplate(name: string): Promise<string> {
 /** Open `dir`, or say why not (refused, or it failed partway and the old workspace stayed open). */
 export async function tryOpenWorkspace(requested: string): Promise<string | null> {
   const dir = await canonical(requested);
+  // From the page, only projects in the switcher: the library, and folders opened before (developer mode).
+  if (!inLibrary(dir) && !(await recentWorkspaces()).includes(dir)) return "That isn't one of your projects.";
   const problem = await unusable(dir);
   if (problem) return problem;
   if (!(await access(dir, constants.W_OK).then(() => true, () => false))) {
@@ -165,6 +168,55 @@ export async function tryOpenWorkspace(requested: string): Promise<string | null
 
 export async function workspaceMessage(): Promise<WorkspaceMessage> {
   const w = current();
-  const recent = (await recentWorkspaces()).map((dir) => ({ dir, name: path.basename(dir) }));
-  return { type: "workspace", id: w.id, dir: w.dir, name: w.name, recent };
+  const recent = await recentWorkspaces();
+  const library = await listProjects();
+  const dirs = [...recent, ...library.map((p) => p.dir).filter((d) => !recent.includes(d))];
+  const projects = await Promise.all(dirs.map(async (dir) => ({ dir, name: await nameOf(dir) })));
+  return { type: "workspace", id: w.id, dir: w.dir, name: w.name, inLibrary: inLibrary(w.dir), projects };
+}
+
+// ---------- the library ----------
+
+/** A new project in the library, opened (empty, so it offers the templates). Returns a problem, or null. */
+export async function newProject(rawName: unknown): Promise<string | null> {
+  const name = cleanName(rawName);
+  if (!name) return "Give the project a name.";
+  return tryOpenWorkspace(await createProject(name));
+}
+
+/** Rename the open project: just its name, the folder stays where it is. */
+export async function renameCurrent(rawName: unknown): Promise<string | null> {
+  const name = cleanName(rawName);
+  const w = current();
+  if (!name) return "Give the project a name.";
+  if (!inLibrary(w.dir)) return "Only projects in underleaf's library can be renamed here.";
+  await renameProject(w.dir, name);
+  w.name = name;
+  broadcast(await workspaceMessage());
+  broadcast(treeMessage());
+  return null;
+}
+
+/** Copy a folder into the library as a new project and open it. The original is never touched. */
+export async function importFolder(requested: string): Promise<string | null> {
+  const source = await canonical(requested);
+  const problem = await unusable(source);
+  if (problem) return problem;
+  if (inLibrary(source)) return "That's already one of your projects.";
+  try {
+    const dir = await copyIntoLibrary(source, cleanName(path.basename(source)) ?? "Imported");
+    return tryOpenWorkspace(dir);
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
+/**
+ * Where to start without a folder on the command line: the project you had open last, else the first in
+ * the library, else a new, empty one (which offers the templates).
+ */
+export async function libraryStart(): Promise<string> {
+  const last = (await recentWorkspaces()).find(inLibrary);
+  if (last) return last;
+  return (await listProjects())[0]?.dir ?? (await createProject("My first document"));
 }

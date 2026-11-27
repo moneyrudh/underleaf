@@ -2,7 +2,7 @@ import { diffArrays } from "diff";
 import type { PageViewport } from "pdfjs-dist";
 import type { ChangeSpec } from "@codemirror/state";
 import { wordsFrom, type TextRun, type Word } from "../compare/diffcore";
-import { buildSourceMap, escapeTyped, type SourceMap, type SourceWord } from "./sourcemap";
+import { buildSourceMap, escapeTyped, type Link, type SourceMap, type SourceWord } from "./sourcemap";
 import { editor, saveFile, sha256 } from "../editor/editor";
 import { state } from "../core/state";
 import { toast } from "../core/util";
@@ -17,6 +17,9 @@ import { API, url } from "../../shared/protocol";
  * them are left alone, characters LaTeX treats specially are escaped, and nothing that would cross
  * markup (a brace, a command) is ever written. It saves like any edit (a version, a rebuild), and the
  * page redraws with the result a moment later.
+ *
+ * A component with a link (\href) also shows the link's address under the text box, so it can be
+ * changed too (a mailto: link shows just the email address).
  *
  * Only text the source spells out can be edited here: not bullets, icons, page numbers, math, or
  * words a macro generates. Structure (new sections, items, commands) is for Source.
@@ -111,7 +114,25 @@ function place(el: HTMLElement, r: Rect, extraRight = 0) {
   el.style.height = `${r.bottom - r.top + 2}px`;
 }
 
-/** Open a text box over a component. */
+/** A link being edited: where its URL is, and the field showing it. */
+type LinkField = { file: string; link: Link; prefix: string; original: string; input: HTMLInputElement };
+
+/** The address as people read it: unescaped, without "mailto:". */
+function linkFields(target: Target, map: SourceMap): Omit<LinkField, "input">[] {
+  const seen = new Set<string>();
+  const out: Omit<LinkField, "input">[] = [];
+  for (const w of target.words) {
+    const source = map.at(w);
+    if (!source?.link || seen.has(`${source.file}:${source.link.from}`)) continue;
+    seen.add(`${source.file}:${source.link.from}`);
+    const raw = map.files.get(source.file)!.text.slice(source.link.from, source.link.to).replace(/\\([%#&_])/g, "$1");
+    const prefix = raw.startsWith("mailto:") ? "mailto:" : "";
+    out.push({ file: source.file, link: source.link, prefix, original: raw.slice(prefix.length) });
+  }
+  return out;
+}
+
+/** Open a text box over a component (and a field for each link in it). */
 function openTarget(target: Target, el: HTMLElement, words: Word[], map: SourceMap) {
   const layer = el.parentElement!;
   if (layer.querySelector(".edit-input")) return;
@@ -135,27 +156,75 @@ function openTarget(target: Target, el: HTMLElement, words: Word[], map: SourceM
   input.style.lineHeight = `${lineHeight}px`;
   el.hidden = true;
   layer.append(input);
+
+  // Links: one field each, just under the text box.
+  const fields: LinkField[] = [];
+  let panel: HTMLElement | null = null;
+  const found = linkFields(target, map);
+  if (found.length) {
+    panel = document.createElement("div");
+    panel.className = "edit-links";
+    panel.style.left = `${box.left - 2}px`;
+    panel.style.top = `${box.bottom + 6}px`;
+    for (const f of found) {
+      const row = document.createElement("label");
+      row.className = "edit-link";
+      const name = document.createElement("span");
+      name.textContent = f.prefix ? "Email" : "Link";
+      const field = document.createElement("input");
+      field.value = f.original;
+      field.spellcheck = false;
+      row.append(name, field);
+      panel.append(row);
+      fields.push({ ...f, input: field });
+    }
+    layer.append(panel);
+    // Keep it on the page: a component near the right edge gets its fields shifted left.
+    const maxLeft = target.page.viewport.width - panel.offsetWidth - 4;
+    panel.style.left = `${Math.max(4, Math.min(box.left - 2, maxLeft))}px`;
+  }
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 
   let done = false;
   const close = () => {
     input.remove();
+    panel?.remove();
     el.hidden = false;
   };
   const finish = async (commit: boolean) => {
     if (done) return;
     done = true;
     const next = input.value.trim().split(/\s+/).filter(Boolean);
-    if (!commit || next.join(" ") === original.join(" ")) return close();
-    input.readOnly = true;
+    const relinked = fields.filter((f) => f.input.value.trim() !== f.original);
+    if (!commit || (next.join(" ") === original.join(" ") && !relinked.length)) return close();
+    for (const el of [input, ...fields.map((f) => f.input)]) el.readOnly = true;
     input.classList.add("pending"); // stays on the page until the rebuilt PDF replaces it
-    const problem = await writeEdit(target.words, original, next, map);
+    panel?.classList.add("pending");
+    const problem = await writeEdit(target.words, original, next, map, relinked);
     if (problem) {
       toast(problem);
       close();
     }
   };
+  // Done when focus leaves the text box and its link fields; Enter in any of them, Esc to cancel.
+  const inside = (node: Node | null) => !!node && (node === input || !!panel?.contains(node));
+  const onBlur = (e: FocusEvent) => {
+    if (!inside(e.relatedTarget as Node | null)) void finish(true);
+  };
+  for (const f of fields) {
+    f.input.onblur = onBlur;
+    f.input.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        void finish(true);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        void finish(false);
+      }
+    };
+  }
   input.onkeydown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault(); // one component is one run of text: Enter means done
@@ -166,7 +235,7 @@ function openTarget(target: Target, el: HTMLElement, words: Word[], map: SourceM
       void finish(false);
     }
   };
-  input.onblur = () => void finish(true);
+  input.onblur = onBlur;
 }
 
 type Change = { from: number; to: number; insert: string };
@@ -176,7 +245,7 @@ type Change = { from: number; to: number; insert: string };
  * words (all mapped, in order), `before` their text, `after` what the box says now. Returns a problem
  * to show, or null.
  */
-async function writeEdit(own: number[], before: string[], after: string[], map: SourceMap): Promise<string | null> {
+async function writeEdit(own: number[], before: string[], after: string[], map: SourceMap, relinked: LinkField[] = []): Promise<string | null> {
   const at = (k: number): SourceWord => map.at(own[k]!)!;
   const changes = new Map<string, Change[]>();
   const add = (file: string, change: Change) => changes.set(file, [...(changes.get(file) ?? []), change]);
@@ -231,6 +300,13 @@ async function writeEdit(own: number[], before: string[], after: string[], map: 
       else if (next) add(next.file, { from: next.from, to: next.from, insert: `${escapeTyped(added.join(" "))} ` });
     }
     k += removed;
+  }
+
+  // New addresses, written the way \href wants them (%, # and & escaped); never with braces or spaces.
+  for (const f of relinked) {
+    const address = f.input.value.trim();
+    if (!address || /[\s{}\\]/.test(address)) return "A link can't be empty or contain spaces, braces or backslashes.";
+    add(f.file, { from: f.link.from, to: f.link.to, insert: f.prefix + address.replace(/[%#&_]/g, (c) => `\\${c}`) });
   }
 
   // The last line of defence: never write a change that removes part of the document's structure.

@@ -41,7 +41,7 @@
 @keyframes changed { from { background: var(--add); } to { background: transparent; } }
 .tree .empty-hint { padding: 2px 8px 6px 22px; color: var(--muted); font-size: 12px; }
 
-/* "2 agent files hidden · Show" */
+/* "2 of Claude's files hidden · Show" */
 .tree-foot {
   display: flex;
   justify-content: space-between;

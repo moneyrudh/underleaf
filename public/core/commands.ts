@@ -4,7 +4,7 @@ import { installKeymap, label, LEADER, type Bindings } from "./keys";
 import { copyPath, mention, quickOpen, reopen, toggleAgentFiles, toggleMiddle, tree } from "../files/open";
 import { editor } from "../editor/editor";
 import { hasSaveTarget, saveAs, savePdf, saveToDownloads } from "../files/save";
-import { openFolder, switchWorkspacePalette } from "../files/workspaces";
+import { importFolder, newProject, renameProject, showFiles, switchWorkspacePalette } from "../files/workspaces";
 import { versions } from "../history/versions";
 import { canCompare, compareVersions, compareWithFile, diffView, toggleCompare } from "../compare/compare";
 import { claude, cyclePane, focused, focusPane, markFocused, setPaneVisible, togglePane, toggleZoomPane } from "./layout";
@@ -54,8 +54,11 @@ export const COMMANDS: Command[] = [
   { id: "save-as", title: "Save PDF As…", keys: ["mod+shift+s"], scope: "global", run: saveAs, when: isDoc },
   { id: "save-again", title: "Save again", run: savePdf, when: () => isDoc() && hasSaveTarget(), palette: false },
   { id: "save-downloads", title: "Save PDF to Downloads", run: saveToDownloads, when: isDoc },
-  { id: "open-folder", title: "Open folder…", run: openFolder },
-  { id: "switch-workspace", title: "Switch workspace…", run: switchWorkspacePalette, when: () => (state.workspace?.recent.length ?? 0) > 1 },
+  { id: "new-project", title: "New project…", run: () => newProject() },
+  { id: "import-folder", title: "Import folder…", run: () => importFolder() },
+  { id: "rename-project", title: "Rename project…", run: () => renameProject(), when: () => !!state.workspace?.inLibrary },
+  { id: "show-files", title: "Show project files", run: () => showFiles() },
+  { id: "switch-workspace", title: "Switch project…", run: () => switchWorkspacePalette(), when: () => (state.workspace?.projects.length ?? 0) > 1 },
   { title: "Focus pane to the left", keys: ["h", "arrowleft"], scope: "leader", run: () => cyclePane(-1), palette: false, sheet: "Focus pane left / right" },
   { title: "Focus pane to the right", keys: ["l", "arrowright"], scope: "leader", run: () => cyclePane(1), palette: false, sheet: "Focus pane left / right" },
   { title: "Focus files", keys: ["1"], scope: "leader", run: () => focusPane("tree"), sheet: "Focus files / Claude / preview" },
@@ -112,8 +115,8 @@ export const COMMANDS: Command[] = [
   { id: "copy-path", title: "Copy path of open file", run: () => copyPath(state.selected), when: () => !!state.selected },
   { title: "Compare with current version", run: () => versions.viewing && compareVersions(versions.viewing, null), when: () => !!versions.viewing && !diffView.active },
   { id: "compare-file", title: "Compare with another file…", run: compareWithFile, when: canCompare },
-  { title: "Show agent memory", run: () => toggleAgentFiles(true), when: () => !tree.agentFilesVisible },
-  { title: "Hide agent memory", run: () => toggleAgentFiles(false), when: () => tree.agentFilesVisible },
+  { title: "Show Claude's files (instructions and memory)", run: () => toggleAgentFiles(true), when: () => !tree.agentFilesVisible },
+  { title: "Hide Claude's files", run: () => toggleAgentFiles(false), when: () => tree.agentFilesVisible },
   {
     title: "Reveal open file in tree",
     run: () => {
