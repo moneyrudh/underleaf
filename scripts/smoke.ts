@@ -615,6 +615,11 @@ await check("no errors in the page", async () => {
   expect(pageErrors.length === 0, pageErrors.join("\n      "));
 });
 
+const serverExit = await Promise.race([server.exited, Bun.sleep(0).then(() => null)]);
+if (failed) {
+  // What the server said last (and whether it was still running): most failures start there.
+  console.log(`\nserver ${serverExit === null ? "still running" : `exited with code ${serverExit}`}; its last output:\n${serverLog.slice(-25).join("\n")}`);
+}
 await cleanup();
 console.log(failed ? `\n${failed} check(s) failed` : "\nall checks passed");
 if (failed && !KEEP) console.log("(re-run with --keep to inspect the scratch workspace)");
