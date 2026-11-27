@@ -37,6 +37,17 @@
   --term-muted: #86958b;
   --term-line: #26322b;
 
+  /* Source editor: LaTeX syntax. Commands, environments (\begin{…}), math, comments, braces. */
+  --syn-command: #1d623a;
+  --syn-env: #8a4a12;
+  --syn-math: #2f5f9e;
+  --syn-comment: #8d998f;
+  --syn-brace: #637268;
+  --editor-selection: rgb(38 122 72 / 0.18);
+  /* PDF pages are white in both themes; text typed on one is black, like the page's own. */
+  --paper: #ffffff;
+  --paper-ink: #111111;
+
   --ui: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --tex: "STIX Two Text", "Latin Modern Roman", "Times New Roman", Georgia, serif;
@@ -75,6 +86,12 @@
     --shadow-pop: 0 16px 38px -10px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.3);
     --shadow-page: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 30px -12px rgb(0 0 0 / 0.6);
     --scrim: rgb(5 8 6 / 0.5);
+    --syn-command: #86d4a2;
+    --syn-env: #e0a86a;
+    --syn-math: #8fb7ec;
+    --syn-comment: #6c7a71;
+    --syn-brace: #8d9b92;
+    --editor-selection: rgb(108 194 138 / 0.22);
     color-scheme: dark;
   }
 }

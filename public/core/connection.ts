@@ -83,7 +83,7 @@ function handle(msg: ServerMessage) {
   state.lastPdf = msg.pdf;
   ui.exportButton.disabled = !msg.pdf;
   if (msg.pdf) {
-    preview.showPdf(msg.pdf, { stale: !msg.ok });
+    preview.showPdf(msg.pdf, { stale: !msg.ok, editable: msg.ok }); // only a good, current build is edited on the page
   } else {
     preview.showMessage(`<strong>${escapeHtml(selected.name)}</strong> hasn't compiled yet — check the logs.`);
   }

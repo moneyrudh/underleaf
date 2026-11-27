@@ -6,6 +6,7 @@
 @import "./styles/tree.css";
 @import "./styles/claude.css";
 @import "./styles/preview.css";
+@import "./styles/editor.css";
 @import "./styles/history.css";
 @import "./styles/compare.css";
 @import "./styles/overlays.css";

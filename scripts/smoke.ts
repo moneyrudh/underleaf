@@ -443,6 +443,126 @@ await check("a folder that can't be opened leaves the current workspace running"
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'after-refusal.md')", "new file listed", 10_000);
 });
 
+// ---------- the source editor ----------
+const notes = path.join(latex, "notes.md");
+const typeInEditor = async (text: string) => {
+  await js("document.querySelector('#editor .cm-content').focus()"); // the cursor starts at the top
+  await cdp.send("Input.insertText", { text });
+};
+
+await check("text files open in the editor; typing saves the file on its own", async () => {
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md' && document.getElementById('preview-body').dataset.editor === 'full'", "notes.md in the editor");
+  await waitFor("document.querySelector('#editor .cm-content')?.innerText.includes('first')", "its text");
+  await typeInEditor("typed in the editor\n");
+  await until(async () => (await Bun.file(notes).text()).startsWith("typed in the editor\n"), 10_000, "the edit on disk");
+  await waitFor("document.querySelector('.editor-col .editor-state').textContent === 'Saved'", "shows Saved");
+});
+
+await check("a change on disk (Claude) reloads the editor when it has no unsaved edits", async () => {
+  await Bun.write(notes, "# notes\n\n- rewritten by Claude\n");
+  await waitFor("document.querySelector('#editor .cm-content').innerText.includes('rewritten by Claude')", "the new text in the editor", 10_000);
+  expect(!(await js<boolean>("!document.querySelector('.editor-col .editor-conflict').hidden")), "asked even though nothing was unsaved");
+});
+
+await check("a change on disk while you have unsaved edits asks; Keep mine overwrites it", async () => {
+  await typeInEditor("mine\n");
+  await Bun.write(notes, "# notes\n\n- Claude again\n"); // lands before the editor's own save
+  await waitFor("!document.querySelector('.editor-col .editor-conflict').hidden", "the conflict bar", 10_000);
+  expect((await Bun.file(notes).text()).includes("Claude again"), "the editor overwrote the file without asking");
+  await click(".editor-col [data-editor-action='keep-mine']");
+  // The editor keeps your cursor across a reload, so "mine" lands wherever it was, not necessarily first.
+  await until(async () => {
+    const disk = await Bun.file(notes).text();
+    return disk.includes("mine\n") && !disk.includes("Claude again");
+  }, 10_000, "your version on disk");
+});
+
+await check("e shows a document's LaTeX in the middle column; ⌘S there saves the file, not the PDF", async () => {
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "main.tex" });
+  await press("Enter");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
+  await focusPreview();
+  await press("e");
+  await waitFor("document.getElementById('claude-pane').dataset.mid === 'source' && document.querySelector('#source .cm-content')?.innerText.includes('documentclass')", "Source in the middle column", 10_000);
+  expect(await js<boolean>("!!document.querySelector('#viewer .pages')"), "the PDF isn't showing in the preview");
+  const pdfWrites = await js<number>("window.__save.writes");
+  await js("document.querySelector('#source .cm-content').focus()");
+  await cdp.send("Input.insertText", { text: "% edited by hand\n" });
+  await press("s", [MOD]);
+  await until(async () => (await Bun.file(main).text()).startsWith("% edited by hand\n"), 3_000, "⌘S saved the source");
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "rebuilt", 20_000);
+  expect((await js<number>("window.__save.writes")) === pdfWrites, "⌘S in the editor saved the PDF");
+  await click("#tab-claude");
+  await waitFor("document.getElementById('claude-pane').dataset.mid === 'claude' && document.querySelector('#terminal .xterm-rows')?.offsetParent !== null", "Claude back in the middle");
+});
+
+await check("editing on the page: components (a title, a place, a paragraph) edited in place, markup untouched", async () => {
+  const paper = path.join(latex, "paper.tex");
+  await Bun.write(
+    paper,
+    "\\documentclass{article}\n\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}\n\\begin{document}\n\\section{Intro}\n" +
+      "The quick brown fox jumps over the lazy dog.\n\n\\job{Engineer}{Acme}\n\nSome \\textbf{bold words} here.\n\n" +
+      "This paragraph is long enough to wrap onto a second printed line of the page, so one component covers two lines " +
+      "and is edited as a single target that ends with zebra.\n\\end{document}\n",
+  );
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'paper.tex')", "paper.tex listed", 10_000);
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "paper.tex" });
+  await press("Enter");
+  const line = (text: string) => `[...document.querySelectorAll('#viewer .edit-target')].find(l => l.dataset.text.includes(${JSON.stringify(text)}))`;
+  const editLine = async (find: string, replace: string) => {
+    await waitFor(`!!${line(find)}`, `an editable line with "${find}"`, 30_000);
+    await js(`${line(find)}.querySelector('.edit-rect').click()`);
+    await waitFor("document.activeElement?.classList.contains('edit-input')", "the text box");
+    await js("document.activeElement.select()");
+    await cdp.send("Input.insertText", { text: replace });
+    await press("Enter");
+  };
+  const disk = () => Bun.file(paper).text();
+  const onDisk = (want: string) =>
+    until(async () => (await disk()).includes(want), 10_000, `"${want}" on disk`).catch(async (e) => {
+      throw new Error(`${(e as Error).message}; on disk: ${JSON.stringify(await disk())}`);
+    });
+
+  await editLine("quick brown fox", "The quick red fox jumps over the lazy cat, 100% sure.");
+  await onDisk("The quick red fox jumps over the lazy cat, 100\\% sure.\n");
+  await waitFor(`!!${line("quick red fox")}`, "the page redrawn with the edit", 30_000);
+  // A macro's arguments are separate components: the title and the place are edited on their own.
+  expect(await js<boolean>(`${line("Acme")}.dataset.text === "Acme"`), "the place shares a target with the title");
+  await editLine("Acme", "Initech");
+  await onDisk("\\job{Engineer}{Initech}");
+  await waitFor(`!!${line("Initech")}`, "redrawn", 30_000);
+  await editLine("Engineer", "Senior Engineer");
+  await onDisk("\\job{Senior Engineer}{Initech}");
+  await waitFor(`!!${line("Senior")}`, "redrawn", 30_000);
+  // Inside \textbf: only the words change.
+  await editLine("bold words", "Some bold text here.");
+  await onDisk("Some \\textbf{bold text} here.");
+  await waitFor(`!!${line("bold text")}`, "redrawn", 30_000);
+  // Joining words across the end of \textbf would cut through it: refused, nothing written.
+  const before = await disk();
+  await editLine("bold text", "Some bold texthere.");
+  await waitFor("/formatting/.test(document.getElementById('toast').textContent)", "explains why it didn't change");
+  expect((await disk()) === before, "the file changed anyway");
+  // A paragraph that wraps is one target, over both of its lines.
+  expect(await js<boolean>(`${line("zebra")}.querySelectorAll('.edit-rect').length >= 2`), "the wrapped paragraph isn't one target over two lines");
+  await editLine(
+    "zebra",
+    "This paragraph is long enough to wrap onto a second printed line of the page, so one component covers two lines and is edited as a single target that ends with giraffe.",
+  );
+  await onDisk("ends with giraffe.\n");
+  expect((await disk()).includes("\\newcommand{\\job}[2]{\\textbf{#1} \\hfill #2}"), "the macro definition changed");
+  // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "notes" });
+  await press("Enter");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
+});
+
 await check("switching workspaces swaps the files, the title and Claude's folder", async () => {
   await js(`fetch("/api/workspace/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: ${JSON.stringify(other)} }) })`);
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'other.tex')", "the other workspace's files", 20_000);
@@ -515,6 +635,11 @@ await check("no errors in the page", async () => {
   expect(pageErrors.length === 0, pageErrors.join("\n      "));
 });
 
+const serverExit = await Promise.race([server.exited, Bun.sleep(0).then(() => null)]);
+if (failed) {
+  // What the server said last (and whether it was still running): most failures start there.
+  console.log(`\nserver ${serverExit === null ? "still running" : `exited with code ${serverExit}`}; its last output:\n${serverLog.slice(-25).join("\n")}`);
+}
 await cleanup();
 console.log(failed ? `\n${failed} check(s) failed` : "\nall checks passed");
 if (failed && !KEEP) console.log("(re-run with --keep to inspect the scratch workspace)");

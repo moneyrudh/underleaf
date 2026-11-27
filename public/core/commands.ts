@@ -1,7 +1,8 @@
 import * as preview from "../preview/preview";
 import { closePalette, openPalette, paletteOpen } from "../ui/palette";
 import { installKeymap, label, LEADER, type Bindings } from "./keys";
-import { copyPath, mention, quickOpen, reopen, toggleAgentFiles, tree } from "../files/open";
+import { copyPath, mention, quickOpen, reopen, toggleAgentFiles, toggleMiddle, tree } from "../files/open";
+import { editor } from "../editor/editor";
 import { hasSaveTarget, saveAs, savePdf, saveToDownloads } from "../files/save";
 import { openFolder, switchWorkspacePalette } from "../files/workspaces";
 import { versions } from "../history/versions";
@@ -48,7 +49,8 @@ export const COMMANDS: Command[] = [
   // ---------- anywhere ----------
   { title: "Go to file…", keys: ["mod+p"], scope: "global", run: () => (paletteOpen() ? closePalette() : quickOpen()) },
   { title: "Command palette", keys: ["mod+shift+p"], scope: "global", run: commandPalette, palette: false },
-  { id: "save", title: "Save PDF", keys: ["mod+s"], scope: "global", run: savePdf, when: isDoc },
+  // ⌘S in the editor saves the file you're typing in (it also saves on its own); anywhere else, the PDF.
+  { id: "save", title: "Save PDF", keys: ["mod+s"], scope: "global", run: () => (editor.hasFocus() ? editor.flush() : savePdf()), when: () => isDoc() || editor.hasFocus() },
   { id: "save-as", title: "Save PDF As…", keys: ["mod+shift+s"], scope: "global", run: saveAs, when: isDoc },
   { id: "save-again", title: "Save again", run: savePdf, when: () => isDoc() && hasSaveTarget(), palette: false },
   { id: "save-downloads", title: "Save PDF to Downloads", run: saveToDownloads, when: isDoc },
@@ -86,6 +88,7 @@ export const COMMANDS: Command[] = [
   { title: "Fit to width", keys: ["="], scope: "preview", run: preview.fitWidth, sheet: "Zoom in / out / fit" },
   { title: "Next error", keys: ["] e"], scope: "preview", run: () => preview.cycleDiagnostic(1), palette: false, sheet: "Next / previous error" },
   { title: "Previous error", keys: ["[ e"], scope: "preview", run: () => preview.cycleDiagnostic(-1), palette: false, sheet: "Next / previous error" },
+  { id: "toggle-source", title: "Switch the middle column: Claude / Source", keys: ["e"], scope: ["tree", "preview"], run: () => toggleMiddle(), sheet: "Claude ↔ the open file's LaTeX" },
   { title: "Toggle logs", keys: ["L"], scope: "preview", run: preview.toggleLogs, when: isDoc },
   { title: "Version history", keys: ["H"], scope: "preview", run: () => versions.toggle(), when: inLatex },
   { id: "version-bar", title: "Toggle version bar", keys: ["V"], scope: "preview", run: () => versions.toggleStrip(), when: () => versions.enabled }, // the bar only exists for files with history

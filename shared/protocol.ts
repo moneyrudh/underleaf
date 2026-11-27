@@ -12,6 +12,8 @@ export const API = {
   pdf: "/api/pdf",
   /** GET ?path= — a file from the tree (`&download` to save it). */
   file: "/api/file",
+  /** POST SaveFileRequest → SaveFileResponse — write a text file from the editor. */
+  fileSave: "/api/file/save",
   /** POST SavedRequest → SavedResponse — record that a document's PDF was saved (a marker in its history). */
   saved: "/api/saved",
   /** POST OpenWorkspaceRequest → OpenWorkspaceResponse — switch to another folder. */
@@ -91,6 +93,14 @@ export type SavedResponse = { ok: true } | { error: string };
 export type OpenWorkspaceRequest = { dir: string };
 export type OpenWorkspaceResponse = { ok: true } | { error: string };
 export type PickFolderResponse = { ok: true; dir: string } | { cancelled: true } | { error: string };
+
+/**
+ * `base`: the SHA-256 (hex, of the UTF-8 text) of the version the editor started from. The save is refused
+ * with `conflict` when the file on disk is no longer that version (Claude or another editor changed it);
+ * null overwrites whatever is there.
+ */
+export type SaveFileRequest = { path: string; text: string; base: string | null };
+export type SaveFileResponse = { ok: true; hash: string } | { conflict: true; text: string; hash: string } | { error: string };
 
 /** `canStart`: the workspace has no .tex files yet, so a template can fill it. */
 export type TemplatesResponse = { templates: TemplateInfo[]; canStart: boolean };

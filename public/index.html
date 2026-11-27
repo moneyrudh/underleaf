@@ -57,10 +57,25 @@
 
       <section id="claude-pane" class="pane claude-pane">
         <div class="pane-head">
-          <span class="pane-title">Claude</span>
-          <span class="hint">in <code id="claude-where"></code></span>
+          <div class="seg pane-tabs" role="tablist" aria-label="Middle column">
+            <button id="tab-claude" role="tab">Claude</button>
+            <button id="tab-source" role="tab" data-key="e">Source</button>
+          </div>
+          <span class="hint claude-only">in <code id="claude-where"></code></span>
+          <span class="spacer"></span>
+          <span class="editor-state source-only" role="status"></span>
         </div>
         <div id="terminal" class="terminal"></div>
+        <div id="source-col" class="source-col">
+          <div class="editor-conflict" role="alert" hidden>
+            <span>This file changed on disk while you were editing it.</span>
+            <span class="spacer"></span>
+            <button class="ghost" data-editor-action="take-theirs">Use the version on disk</button>
+            <button class="primary" data-editor-action="keep-mine">Keep mine</button>
+          </div>
+          <div id="source" class="editor"></div>
+          <p id="source-empty" class="message">Open a document to see its LaTeX here.</p>
+        </div>
       </section>
       <div class="splitter" data-pane="claude-pane" data-var="--claude-w"></div>
 
@@ -145,6 +160,16 @@
           <div id="version-tip" class="version-tip" hidden></div>
         </div>
         <div id="preview-body" class="preview-body">
+          <div id="editor-col" class="editor-col">
+            <div class="editor-conflict" role="alert" hidden>
+              <span>This file changed on disk while you were editing it.</span>
+              <span class="spacer"></span>
+              <button class="ghost" data-editor-action="take-theirs">Use the version on disk</button>
+              <button class="primary" data-editor-action="keep-mine">Keep mine</button>
+            </div>
+            <div id="editor" class="editor"></div>
+            <div class="editor-foot"><span class="editor-state" role="status"></span></div>
+          </div>
           <div class="viewer-col">
             <div id="snapshot-banner" class="snapshot-banner" hidden>
               <span class="snapshot-what"></span>

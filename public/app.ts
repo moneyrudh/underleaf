@@ -2,6 +2,7 @@ import { label } from "./core/keys";
 import { installHints } from "./ui/hints";
 import { initLayout, focusPane } from "./core/layout";
 import { initOpening } from "./files/open";
+import { initEditor } from "./editor/editor";
 import { initWorkspaces } from "./files/workspaces";
 import { initCheatsheet } from "./ui/cheatsheet";
 import { commandAvailable, installCommands, runCommand } from "./core/commands";
@@ -24,6 +25,7 @@ import { STORED, storage } from "./core/util";
 
 initLayout();
 initOpening();
+initEditor();
 initWorkspaces();
 initCheatsheet();
 installCommands();

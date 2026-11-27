@@ -70,11 +70,11 @@ Click a folder to expand it, and click a file to open it:
 
 | File | What happens |
 |---|---|
-| `.tex` with `\documentclass` | Compiles and previews live, with errors in **Logs**, page count, and **Save PDF** |
-| `.tex` without it (`\input` fragments) | Shown as source. Saving it still rebuilds whichever document you have open. |
+| `.tex` with `\documentclass` | Compiles and previews live; its text can be edited on the page, its LaTeX in Source. Errors in **Logs**, page count, and **Save PDF** |
+| `.tex` without it (`\input` fragments) | Opens in the editor. Saving it rebuilds whichever document you have open (and its text can be edited on that document's page). |
 | `.pdf` | Rendered |
 | images | Shown as-is |
-| `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Shown as text |
+| `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Opens in the editor |
 | anything else | Listed, with a download button |
 
 Hidden files (dotfiles) and symlinks are left out of the tree.
@@ -133,6 +133,16 @@ Pick either side from the two menus. While comparing, the version bar and `,`/`.
 
 History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
 
+### Editing
+
+**On the page.** The preview is your compiled PDF, and its text can be edited where it stands. Hover to see what can be changed: a heading, a job title, a date, a whole bullet, a paragraph, each outlined on every line it covers. Click it and it becomes a text box right on the page. Type, then press Enter (or click away; Esc cancels). underleaf writes the change into your LaTeX at exactly the words that printed it, leaving the commands around them alone and escaping characters LaTeX treats specially (`%`, `&`, `$`…); a change that would cut through formatting (say, joining a bold word with the next) is refused rather than written, and the page redraws with the result a moment later. Because the page is TeX's own output, what you edit is exactly what you'll send.
+
+What can be edited on the page is the text your source spells out: paragraphs, headings, list items, the arguments of your own macros (a resume's titles, dates, bullets). Bullets, icons, page numbers, math and text a macro generates aren't, and structure (a new section, a new item) isn't either: that's for Source.
+
+**Source.** The raw LaTeX, in the middle column where Claude is (**Claude | Source**, or press `e`). Other text files (`\input` chapters, `.bib`, notes) open in the editor in the preview.
+
+Both save the same way: edits are saved a moment after you stop typing (`⌘S` in the editor saves at once; elsewhere it saves the PDF), each save rebuilds the document and lands in version history as "You edited". If Claude changes the file you're editing in Source, it takes the new version when you have nothing unsaved; if you do, it asks: **Use the version on disk** or **Keep mine**.
+
 ### Keyboard
 
 Press `?` (or the **?** button) for the full list. The essentials:
@@ -141,7 +151,8 @@ Press `?` (or the **?** button) for the full list. The essentials:
 |---|---|
 | `⌘P` / `Ctrl+P` | Go to file (fuzzy search) |
 | `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
-| `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…) |
+| `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…); in the editor, save the file |
+| `e` | Show the open file's LaTeX (Source) in the middle column, or Claude again |
 | `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
 | `Ctrl+Space` then `z` | Zoom the focused pane |
 

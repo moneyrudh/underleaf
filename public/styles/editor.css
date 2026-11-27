@@ -1,0 +1,52 @@
+/* Editing. The middle column switches between Claude and the open document's LaTeX (Source); other
+   text files fill the preview with the editor ("full"). Editing on the page itself is in preview.css. */
+
+/* ---------- middle column: Claude / Source ---------- */
+
+.pane-tabs button { padding: 2px 10px; }
+.claude-pane .source-col { display: none; flex: 1; flex-direction: column; min-height: 0; background: var(--panel); }
+.claude-pane[data-mid="source"] .terminal { display: none; }
+.claude-pane[data-mid="source"] .source-col { display: flex; }
+.claude-pane[data-mid="source"] .claude-only,
+.claude-pane:not([data-mid="source"]) .source-only { display: none; }
+/* No LaTeX file open: Source says so instead of showing the last one. */
+.claude-pane:not([data-has-source]) #source { display: none; }
+.claude-pane[data-has-source] #source-empty { display: none; }
+.source-col .message { margin-top: 30vh; }
+
+/* ---------- preview: the editors ---------- */
+
+.editor-col { display: none; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.preview-body[data-editor="full"] .editor-col { display: flex; background: var(--panel); }
+.preview-body[data-editor] .viewer-col { display: none; }
+
+/* An earlier version or a comparison is about the past: the live file's editor steps aside. */
+.preview-body:has(#snapshot-banner:not([hidden])) .editor-col,
+.preview-body:has(.viewer-col.comparing) .editor-col { display: none; }
+.preview-body[data-editor]:has(#snapshot-banner:not([hidden])) .viewer-col,
+.preview-body[data-editor]:has(.viewer-col.comparing) .viewer-col { display: flex; }
+/* Zoom is for the PDF. */
+.preview-pane:has(.preview-body[data-editor="full"]) #zoom { display: none; }
+
+.editor { flex: 1; min-height: 0; }
+.editor .cm-editor { height: 100%; }
+
+.editor-conflict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--warn-soft);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13px;
+}
+.editor-conflict[hidden] { display: none; }
+.editor-conflict .spacer { flex: 1; }
+
+.editor-foot { flex: none; display: flex; justify-content: flex-end; padding: 3px 12px; border-top: 1px solid var(--line); background: var(--chrome); }
+.editor-state { font: 11px/1.6 var(--mono); color: var(--faint); white-space: nowrap; }
+.editor-state[data-state="unsaved"], .editor-state[data-state="saving"] { color: var(--muted); }
+.editor-state[data-state="conflict"] { color: var(--warn); }
+.editor-state[data-state="error"] { color: var(--error); }
