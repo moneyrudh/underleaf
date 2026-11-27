@@ -48,11 +48,6 @@
 .kind-restore.icon, .menu .kind-restore .icon { color: var(--kind-restore); }
 .kind-current.icon, .menu .kind-current .icon { color: var(--leaf); font-size: 9px; }
 
-.seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.seg button { height: 24px; padding: 0 9px; font-size: 12px; color: var(--muted); }
-.seg button.on { background: var(--leaf-soft); color: var(--ink); font-weight: 500; }
-.seg button:disabled { opacity: 0.4; cursor: default; }
-.seg button.on kbd.k { display: none; } /* S switches to the other view, so only the other button shows it */
 
 .diff > * { transition: opacity 150ms ease-out; }
 .diff.loading > * { opacity: 0.45; }

@@ -172,6 +172,16 @@ await check("every element id the code looks up exists in index.html", async () 
 
 await cdp.send("Page.navigate", { url: `http://localhost:${port}/#latex/main.tex` });
 
+await check("a LaTeX document opens in the visual editor: headings and text shown, markup hidden", async () => {
+  await waitFor("document.getElementById('preview-body').dataset.editor === 'visual'", "the visual editor", 20_000);
+  await waitFor("[...document.querySelectorAll('#visual .vh')].some(h => h.textContent.includes('Professional Summary'))", "the section heading, rendered", 10_000);
+  const shown = await js<string>("document.querySelector('#visual .cm-content').innerText");
+  expect(!shown.includes("\\section{"), "\\section{ is visible in the visual view");
+  expect(!shown.includes("\\documentclass"), "the preamble isn't folded away");
+  // The rest of these checks look at the PDF; the choice is remembered, as it is for you.
+  await click("#view-pdf");
+});
+
 await check("opens and compiles the document", async () => {
   await waitFor("document.querySelectorAll('#viewer canvas.page').length > 0", "first PDF page", 20_000);
   await waitFor("document.getElementById('status').textContent.startsWith('Built')", "the Built status", 20_000); // a background build may still be finishing
@@ -455,21 +465,21 @@ await check("text files open in the editor; typing saves the file on its own", a
   await waitFor("document.querySelector('#editor .cm-content')?.innerText.includes('first')", "its text");
   await typeInEditor("typed in the editor\n");
   await until(async () => (await Bun.file(notes).text()).startsWith("typed in the editor\n"), 10_000, "the edit on disk");
-  await waitFor("document.getElementById('editor-state').textContent === 'Saved'", "shows Saved");
+  await waitFor("document.querySelector('.editor-col .editor-state').textContent === 'Saved'", "shows Saved");
 });
 
 await check("a change on disk (Claude) reloads the editor when it has no unsaved edits", async () => {
   await Bun.write(notes, "# notes\n\n- rewritten by Claude\n");
   await waitFor("document.querySelector('#editor .cm-content').innerText.includes('rewritten by Claude')", "the new text in the editor", 10_000);
-  expect(!(await js<boolean>("!document.getElementById('editor-conflict').hidden")), "asked even though nothing was unsaved");
+  expect(!(await js<boolean>("!document.querySelector('.editor-col .editor-conflict').hidden")), "asked even though nothing was unsaved");
 });
 
 await check("a change on disk while you have unsaved edits asks; Keep mine overwrites it", async () => {
   await typeInEditor("mine\n");
   await Bun.write(notes, "# notes\n\n- Claude again\n"); // lands before the editor's own save
-  await waitFor("!document.getElementById('editor-conflict').hidden", "the conflict bar", 10_000);
+  await waitFor("!document.querySelector('.editor-col .editor-conflict').hidden", "the conflict bar", 10_000);
   expect((await Bun.file(notes).text()).includes("Claude again"), "the editor overwrote the file without asking");
-  await click("#editor-keep-mine");
+  await click(".editor-col [data-editor-action='keep-mine']");
   // The editor keeps your cursor across a reload, so "mine" lands wherever it was, not necessarily first.
   await until(async () => {
     const disk = await Bun.file(notes).text();
@@ -477,7 +487,7 @@ await check("a change on disk while you have unsaved edits asks; Keep mine overw
   }, 10_000, "your version on disk");
 });
 
-await check("e puts the source beside the PDF; ⌘S in the editor saves the file, not the PDF", async () => {
+await check("e shows a document's LaTeX in the middle column; ⌘S there saves the file, not the PDF", async () => {
   await press("p", [MOD]);
   await waitFor("!document.getElementById('palette').hidden", "palette");
   await cdp.send("Input.insertText", { text: "main.tex" });
@@ -485,17 +495,46 @@ await check("e puts the source beside the PDF; ⌘S in the editor saves the file
   await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
   await focusPreview();
   await press("e");
-  await waitFor("document.getElementById('preview-body').dataset.editor === 'split' && document.querySelector('#editor .cm-content')?.innerText.includes('documentclass')", "the source beside the PDF", 10_000);
-  expect(await js<boolean>("!!document.querySelector('#viewer .pages')"), "the PDF isn't showing beside it");
+  await waitFor("document.getElementById('claude-pane').dataset.mid === 'source' && document.querySelector('#source .cm-content')?.innerText.includes('documentclass')", "Source in the middle column", 10_000);
+  expect(await js<boolean>("!!document.querySelector('#viewer .pages')"), "the PDF isn't showing in the preview");
   const pdfWrites = await js<number>("window.__save.writes");
-  await typeInEditor("% edited by hand\n");
+  await js("document.querySelector('#source .cm-content').focus()");
+  await cdp.send("Input.insertText", { text: "% edited by hand\n" });
   await press("s", [MOD]);
   await until(async () => (await Bun.file(main).text()).startsWith("% edited by hand\n"), 3_000, "⌘S saved the source");
   await waitFor("document.getElementById('status').textContent.startsWith('Built')", "rebuilt", 20_000);
   expect((await js<number>("window.__save.writes")) === pdfWrites, "⌘S in the editor saved the PDF");
-  await focusPreview();
-  await press("e");
-  await waitFor("document.getElementById('preview-body').dataset.editor === undefined", "the editor closed");
+  await click("#tab-claude");
+  await waitFor("document.getElementById('claude-pane').dataset.mid === 'claude' && document.querySelector('#terminal .xterm-rows')?.offsetParent !== null", "Claude back in the middle");
+});
+
+await check("typing in the visual editor writes LaTeX: formatting, escaped characters, Enter for a new paragraph", async () => {
+  const paper = path.join(latex, "paper.tex");
+  await Bun.write(paper, "\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nSee $x^2$ and \\cite{knuth}.\n\\begin{itemize}\n  \\item first\n\\end{itemize}\n\\end{document}\n");
+  await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'paper.tex')", "paper.tex listed", 10_000);
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "paper.tex" });
+  await press("Enter");
+  await click("#view-visual");
+  await waitFor("document.querySelector('#visual .vh-2')?.textContent === 'Intro'", "the heading", 10_000);
+  expect(await js<boolean>("!!document.querySelector('#visual .katex')"), "math isn't rendered");
+  expect(await js<boolean>("[...document.querySelectorAll('#visual .vm-cite')].some(c => c.textContent === '[knuth]')"), "the citation chip is missing");
+  expect(await js<boolean>("[...document.querySelectorAll('#visual .vm-bullet')].some(b => b.textContent === '•')"), "the list bullet is missing");
+  // Visual focuses the editor (through CodeMirror, as a click would) with the cursor where the text starts,
+  // before the heading: type a paragraph there.
+  await click("#view-visual");
+  await waitFor("document.activeElement?.closest('#visual') !== null", "the visual editor focused");
+  await cdp.send("Input.insertText", { text: "Costs 5% & up" });
+  await press("Enter");
+  await until(async () => (await Bun.file(paper).text()).includes("Costs 5\\% \\& up\n\n"), 5_000, "escaped text and a paragraph break on disk").catch(async (e) => {
+    throw new Error(`${(e as Error).message}; on disk: ${JSON.stringify(await Bun.file(paper).text())}`);
+  });
+  await click(".format-bar [data-format='bold']");
+  await cdp.send("Input.insertText", { text: "strong" });
+  await until(async () => (await Bun.file(paper).text()).includes("\\textbf{strong}"), 5_000, "bold written as \\textbf");
+  await waitFor("[...document.querySelectorAll('#visual .vs-bold')].length > 0 || document.querySelector('#visual .vm-raw')?.textContent.includes('textbf')", "bold in the view");
+  await click("#view-pdf");
   // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
   await press("p", [MOD]);
   await waitFor("!document.getElementById('palette').hidden", "palette");

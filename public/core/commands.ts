@@ -1,7 +1,7 @@
 import * as preview from "../preview/preview";
 import { closePalette, openPalette, paletteOpen } from "../ui/palette";
 import { installKeymap, label, LEADER, type Bindings } from "./keys";
-import { copyPath, mention, quickOpen, reopen, toggleAgentFiles, toggleEditSource, tree } from "../files/open";
+import { copyPath, mention, quickOpen, reopen, setPreviewView, toggleAgentFiles, toggleMiddle, tree } from "../files/open";
 import { editor } from "../editor/editor";
 import { hasSaveTarget, saveAs, savePdf, saveToDownloads } from "../files/save";
 import { openFolder, switchWorkspacePalette } from "../files/workspaces";
@@ -88,7 +88,9 @@ export const COMMANDS: Command[] = [
   { title: "Fit to width", keys: ["="], scope: "preview", run: preview.fitWidth, sheet: "Zoom in / out / fit" },
   { title: "Next error", keys: ["] e"], scope: "preview", run: () => preview.cycleDiagnostic(1), palette: false, sheet: "Next / previous error" },
   { title: "Previous error", keys: ["[ e"], scope: "preview", run: () => preview.cycleDiagnostic(-1), palette: false, sheet: "Next / previous error" },
-  { id: "edit-source", title: "Edit source beside the PDF", keys: ["e"], scope: "preview", run: toggleEditSource, when: isDoc },
+  { id: "toggle-source", title: "Switch the middle column: Claude / Source", keys: ["e"], scope: ["tree", "preview"], run: () => toggleMiddle(), sheet: "Claude ↔ the open file's LaTeX" },
+  { id: "view-visual", title: "Show the visual editor", run: () => setPreviewView("visual"), when: isDoc },
+  { id: "view-pdf", title: "Show the PDF", run: () => setPreviewView("pdf"), when: isDoc },
   { title: "Toggle logs", keys: ["L"], scope: "preview", run: preview.toggleLogs, when: isDoc },
   { title: "Version history", keys: ["H"], scope: "preview", run: () => versions.toggle(), when: inLatex },
   { id: "version-bar", title: "Toggle version bar", keys: ["V"], scope: "preview", run: () => versions.toggleStrip(), when: () => versions.enabled }, // the bar only exists for files with history

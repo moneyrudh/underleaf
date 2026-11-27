@@ -80,6 +80,11 @@
 }
 .hint { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .claude-pane .pane-title, .claude-pane .hint { color: var(--term-muted); }
+/* Claude / Source tabs sit on the terminal's dark header in both themes. */
+.claude-pane .seg { border-color: var(--term-line); }
+.claude-pane .seg button { color: var(--term-muted); }
+.claude-pane .seg button:hover { color: var(--term-ink); }
+.claude-pane .seg button.on { background: var(--term-line); color: var(--term-ink); }
 
 /* Focus: the focused pane's title brightens and a thin accent line runs along its top. */
 .pane-head::after {

@@ -10,7 +10,8 @@ export const STORED = {
   expanded: "expanded", // open folders in the tree
   showAgentFiles: "show-agent-files",
   versionStrip: "version-strip", // version bar shown
-  editSource: "edit-source", // documents open with the source editor beside the PDF ("1"/"0")
+  middle: "middle", // the middle column shows "claude" or "source"
+  previewView: "preview-view", // LaTeX documents show "visual" (the default) or "pdf"
   // Panes shown ("1"/"0"), keyed by the pane's element id.
   treePane: "tree-pane",
   claudePane: "claude-pane",

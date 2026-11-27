@@ -1,5 +1,6 @@
 import { ClaudeTerminal } from "../claude/terminal";
 import { $, STORED, storage } from "./util";
+import { editor } from "../editor/editor";
 
 /** The three panes: which is focused, which are shown, zoom, and the splitters between them. */
 
@@ -41,8 +42,14 @@ export function focusPane(name: PaneName) {
   if (PANES[name].hidden) setPaneVisible(name, true);
   markFocused(name); // don't rely on focusin alone: it doesn't fire while the window itself is unfocused
   if (workspace.dataset.zoom && workspace.dataset.zoom !== name) workspace.dataset.zoom = name;
-  if (name === "claude") claude.focus();
+  if (name === "claude") focusMiddle();
   else PANES[name].focus({ preventScroll: true });
+}
+
+/** The middle column holds Claude or the Source editor: focus whichever is showing. */
+function focusMiddle() {
+  if (PANES.claude.dataset.mid === "source" && editor.path) editor.focus("raw");
+  else claude.focus();
 }
 
 export function cyclePane(dir: 1 | -1) {
@@ -67,7 +74,7 @@ export function setPaneVisible(name: PaneName, visible: boolean) {
   TOGGLES[name]?.classList.toggle("on", visible);
   TOGGLES[name]?.setAttribute("aria-pressed", String(visible));
   storage(SHOWN_KEY[name], visible ? "1" : "0");
-  if (visible && name === "claude") claude.focus();
+  if (visible && name === "claude") focusMiddle();
   if (!visible && focusedPane === name) focusPane("preview");
 }
 

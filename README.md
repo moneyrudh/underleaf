@@ -70,8 +70,8 @@ Click a folder to expand it, and click a file to open it:
 
 | File | What happens |
 |---|---|
-| `.tex` with `\documentclass` | Compiles and previews live, with errors in **Logs**, page count, and **Save PDF** |
-| `.tex` without it (`\input` fragments) | Opens in the editor. Saving it rebuilds whichever document you have open. |
+| `.tex` with `\documentclass` | Opens in the Visual editor; compiles live, with the PDF a click away, errors in **Logs**, page count, and **Save PDF** |
+| `.tex` without it (`\input` fragments) | Opens in the Visual editor (and Source). Saving it rebuilds whichever document you have open. |
 | `.pdf` | Rendered |
 | images | Shown as-is |
 | `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Opens in the editor |
@@ -133,13 +133,19 @@ Pick either side from the two menus. While comparing, the version bar and `,`/`.
 
 History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
 
-### Editing by hand
+### Editing
 
-Press `e` in the preview (or the pencil in its toolbar) to open a document's source beside the PDF; drag the line between them to resize. Other text files (`\input` chapters, `.bib`, notes) open straight in the editor. It highlights LaTeX, wraps long lines, and has search (`⌘F`).
+A LaTeX file opens in the **Visual** editor: the document as you'd read it, editable. Headings look like headings, `\textbf` is bold, math is typeset (KaTeX), lists have bullets, citations and references are small chips, figures show their images, and the preamble folds into one "document settings" line. Type as you would in a word processor: Enter starts a new paragraph (or a new list item), and characters that mean something to LaTeX (`%`, `&`, `#`, `_`, `$`) are written so they print as typed. The toolbar (and `⌘B`, `⌘I`, `⌘M`) adds bold, italics, headings, lists, math, and citations.
 
-There's no save button to remember: the editor saves a moment after you stop typing, and `⌘S` while typing in it saves at once (outside the editor, `⌘S` saves the PDF). Each save rebuilds the document and lands in version history as "You edited", like any other change.
+Nothing is converted: the Visual editor shows the LaTeX file itself with the markup hidden. Where your cursor is, that piece shows its LaTeX so you can edit it, and renders again when you move on. Anything it doesn't know (a class's own macros, tables) stays as written, never guessed at.
 
-If Claude changes the file you're editing, the editor takes the new version when you have nothing unsaved. If you do, it asks: **Use the version on disk** or **Keep mine**. Nothing is overwritten without asking.
+- **PDF**: the **Visual | PDF** switch in the preview shows the compiled document (exact layout, page breaks, page count). Your choice is remembered.
+- **Source**: the raw LaTeX, in the middle column where Claude is (**Claude | Source**, or press `e`). Both editors show the same text, so typing in one updates the other at once.
+- Other text files (`.bib`, notes) open in a plain editor in the preview.
+
+There's no save button to remember: edits are saved a moment after you stop typing (`⌘S` in an editor saves at once; elsewhere it saves the PDF). Each save rebuilds the document and lands in version history as "You edited".
+
+If Claude changes the file you're editing, the editors take the new version when you have nothing unsaved. If you do, they ask: **Use the version on disk** or **Keep mine**. Nothing is overwritten without asking.
 
 ### Keyboard
 
@@ -150,7 +156,8 @@ Press `?` (or the **?** button) for the full list. The essentials:
 | `⌘P` / `Ctrl+P` | Go to file (fuzzy search) |
 | `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
 | `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…); in the editor, save the file |
-| `e` | Edit the document's source beside the PDF |
+| `e` | Show the open file's LaTeX (Source) in the middle column, or Claude again |
+| `⌘B` / `⌘I` / `⌘M` | In the Visual editor: bold, italics, math |
 | `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
 | `Ctrl+Space` then `z` | Zoom the focused pane |
 
