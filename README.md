@@ -71,10 +71,10 @@ Click a folder to expand it, and click a file to open it:
 | File | What happens |
 |---|---|
 | `.tex` with `\documentclass` | Compiles and previews live, with errors in **Logs**, page count, and **Save PDF** |
-| `.tex` without it (`\input` fragments) | Shown as source. Saving it still rebuilds whichever document you have open. |
+| `.tex` without it (`\input` fragments) | Opens in the editor. Saving it rebuilds whichever document you have open. |
 | `.pdf` | Rendered |
 | images | Shown as-is |
-| `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Shown as text |
+| `.bib`, `.cls`, `.sty`, `.md`, `.txt`… | Opens in the editor |
 | anything else | Listed, with a download button |
 
 Hidden files (dotfiles) and symlinks are left out of the tree.
@@ -133,6 +133,14 @@ Pick either side from the two menus. While comparing, the version bar and `,`/`.
 
 History is stored in `~/.underleaf/history/`, not in your folder (set `UNDERLEAF_HOME` to move it). It needs `git` installed; without it, everything else still works. To label Claude's turns, underleaf adds two hooks to `latex/.claude/settings.json` (anything else in that file is left as is).
 
+### Editing by hand
+
+Press `e` in the preview (or the pencil in its toolbar) to open a document's source beside the PDF; drag the line between them to resize. Other text files (`\input` chapters, `.bib`, notes) open straight in the editor. It highlights LaTeX, wraps long lines, and has search (`⌘F`).
+
+There's no save button to remember: the editor saves a moment after you stop typing, and `⌘S` while typing in it saves at once (outside the editor, `⌘S` saves the PDF). Each save rebuilds the document and lands in version history as "You edited", like any other change.
+
+If Claude changes the file you're editing, the editor takes the new version when you have nothing unsaved. If you do, it asks: **Use the version on disk** or **Keep mine**. Nothing is overwritten without asking.
+
 ### Keyboard
 
 Press `?` (or the **?** button) for the full list. The essentials:
@@ -141,7 +149,8 @@ Press `?` (or the **?** button) for the full list. The essentials:
 |---|---|
 | `⌘P` / `Ctrl+P` | Go to file (fuzzy search) |
 | `⌘⇧P` / `Ctrl+Shift+P` | Command palette |
-| `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…) |
+| `⌘S` / `Ctrl+S` | Save PDF (`⌘⇧S`: Save As…); in the editor, save the file |
+| `e` | Edit the document's source beside the PDF |
 | `Ctrl+Space` then `h` / `l` / `1` `2` `3` | Move between panes (files, Claude, preview) |
 | `Ctrl+Space` then `z` | Zoom the focused pane |
 

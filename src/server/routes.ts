@@ -11,7 +11,8 @@ import { appClients, broadcast, claude, HOOK_TOKEN, setLastOpened, type WsData }
 import { buildSnapshot, cancelEditSnapshot, history, onClaudeHook, snapshot } from "../history/snapshots";
 import { docs, scheduleBrief, treeMessage } from "./trees";
 import type { HistoryStore } from "../history/store";
-import { CONTENT_TYPES, resolveTreePath } from "../workspace/files";
+import { CONTENT_TYPES, kindOf, resolveTreePath } from "../workspace/files";
+import { rename } from "node:fs/promises";
 import { CLAUDE_STARTS } from "../../shared/types";
 import {
   API,
@@ -21,6 +22,8 @@ import {
   type OpenWorkspaceRequest,
   type OpenWorkspaceResponse,
   type PickFolderResponse,
+  type SaveFileRequest,
+  type SaveFileResponse,
   type StartTemplateRequest,
   type StartTemplateResponse,
   type TemplatesResponse,
@@ -62,6 +65,37 @@ async function recordSave(req: Request): Promise<Response> {
     await snapshot({ kind: "export", author: "You", label, allowEmpty: true, about: relDoc(doc) });
   }
   return Response.json({ ok: true } satisfies SavedResponse);
+}
+
+const EDITABLE = new Set(["doc", "tex", "text"]);
+const MAX_EDIT_BYTES = 5 * 1024 * 1024;
+const sha256 = (data: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(data).digest("hex");
+
+/**
+ * Write a file from the editor, unless it changed on disk since the editor's version (`base`):
+ * then answer with what's there now, so the page can offer to reload or keep its own.
+ * Written beside the file and renamed over it, so nothing ever reads half a file. The watcher
+ * turns the write into a rebuild and a "You edited" snapshot like any other change.
+ */
+async function saveFile(req: Request): Promise<Response> {
+  if (!trusted(req)) return forbidden();
+  const { path: treePath, text, base } = (await req.json().catch(() => ({}))) as Partial<SaveFileRequest>;
+  const bad = (error: string, status = 400) => Response.json({ error } satisfies SaveFileResponse, { status });
+  if (typeof treePath !== "string" || typeof text !== "string" || (base !== null && typeof base !== "string")) return bad("Bad request");
+  if (Buffer.byteLength(text) > MAX_EDIT_BYTES) return bad("That file is too big to edit here.", 413);
+  const abs = await resolveTreePath(current().roots, treePath);
+  if (!abs) return bad("That file isn't in this workspace anymore.", 404);
+  if (!EDITABLE.has(await kindOf(abs))) return bad("Only text files can be edited here.");
+
+  const disk = new Uint8Array(await Bun.file(abs).arrayBuffer());
+  const diskHash = sha256(disk);
+  if (base !== null && base !== diskHash) {
+    return Response.json({ conflict: true, text: new TextDecoder().decode(disk), hash: diskHash } satisfies SaveFileResponse, { status: 409 });
+  }
+  const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.underleaf-save`); // hidden: the watcher ignores it
+  await Bun.write(tmp, text);
+  await rename(tmp, abs);
+  return Response.json({ ok: true, hash: sha256(text) } satisfies SaveFileResponse);
 }
 
 // The server can drive a shell-capable agent, so only talk to pages served by
@@ -117,6 +151,10 @@ export function startServer() {
         };
         if (url.searchParams.has("download")) headers["Content-Disposition"] = `attachment; filename="${path.basename(abs)}"`;
         return new Response(Bun.file(abs), { headers });
+      },
+
+      [API.fileSave]: {
+        POST: (req: Request) => oneSaveAtATime(() => saveFile(req)),
       },
 
       [API.claudeHook]: {

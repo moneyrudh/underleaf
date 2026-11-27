@@ -12,6 +12,7 @@ import type { DirNode, FileNode } from "../../shared/types";
 import { API, url } from "../../shared/protocol";
 import { loadSaveTarget, savePdf } from "./save";
 import { showTemplates } from "./templates";
+import { editor } from "../editor/editor";
 
 /** Opening files, keeping the preview in step with the file tree, and acting on files. */
 
@@ -22,6 +23,7 @@ export function initOpening() {
   ui.exportButton.onclick = savePdf;
   $("agent-toggle").onclick = () => toggleAgentFiles(!tree.agentFilesVisible);
   $("quick-open").onclick = quickOpen;
+  $("toggle-edit").onclick = toggleEditSource;
   window.addEventListener("hashchange", () => {
     const file = tree.find(decodeURIComponent(location.hash.slice(1)));
     if (file && file.path !== state.selected?.path) open(file);
@@ -46,6 +48,8 @@ export function onTree(trees: DirNode[]) {
   if (!selected) return;
 
   const now = tree.find(selected.path);
+  // The editor reconciles its own file: our saves are ignored, Claude's are taken or asked about.
+  if (now && editor.path === now.path && now.mtime !== selected.mtime) void editor.changedOnDisk(now);
   if (!now) {
     // Deleted or renamed out from under us.
     toast(`${selected.path} was removed`);
@@ -57,7 +61,7 @@ export function onTree(trees: DirNode[]) {
     state.selected = now;
   } else if (versions.viewing) {
     state.selected = now; // looking at an earlier version: the live file refreshes when you go back
-  } else if (now.kind !== selected.kind || (now.kind !== "doc" && now.mtime !== selected.mtime)) {
+  } else if (now.kind !== selected.kind || (now.kind !== "doc" && now.mtime !== selected.mtime && editor.path !== now.path)) {
     open(now); // changed on disk → refresh the preview (docs refresh via compile messages)
   } else {
     state.selected = now;
@@ -80,6 +84,7 @@ export function open(file: FileNode) {
   storage(STORED.recent, JSON.stringify(state.recent));
   document.title = `${file.name} · underleaf`;
   ui.title.textContent = file.path;
+  showEditor(file);
 
   const isDoc = file.kind === "doc";
   const fileUrl = url(API.file, { path: file.path, v: file.mtime });
@@ -107,8 +112,8 @@ export function open(file: FileNode) {
   if (file.kind === "pdf") preview.showPdf(fileUrl);
   else if (file.kind === "image") preview.showImage(fileUrl);
   else if (file.kind === "tex" || file.kind === "text") {
-    preview.showText(fileUrl);
-    if (file.kind === "tex") preview.setStatus("Part of another document", "info", "No \\documentclass: this file is included by another one, so it's shown as source.");
+    // Text files open in the editor (it fills the pane); the viewer only shows them for earlier versions.
+    if (file.kind === "tex") preview.setStatus("Part of another document", "info", "No \\documentclass: another file includes this one. Saving it rebuilds the documents that are open.");
   } else {
     preview.showMessage(`No preview for <strong>${escapeHtml(file.name)}</strong>.<br>Download it from the ⋯ menu.`);
   }
@@ -127,8 +132,46 @@ export function showNothing() {
   hideDocumentActions();
   preview.showLogsButton(false);
   preview.setStatus("");
+  showEditor(null);
   if (!tree.hasTex()) return void showTemplates();
   preview.showMessage("Pick a file on the left, or ask Claude to create a <code>.tex</code> file here.");
+}
+
+// ---------- the source editor ----------
+
+/**
+ * Text files (.bib, .md, \input fragments…) always open in the editor, which fills the pane.
+ * Documents show the PDF, with the editor beside it when "Edit source" (e) is on. The editor steps
+ * aside on its own (CSS) while an earlier version or a comparison is on screen.
+ */
+function editorMode(file: FileNode | null): "full" | "split" | null {
+  if (!file) return null;
+  if (file.kind === "tex" || file.kind === "text") return "full";
+  if (file.kind === "doc" && storage(STORED.editSource) === "1") return "split";
+  return null;
+}
+
+function showEditor(file: FileNode | null) {
+  const mode = editorMode(file);
+  const body = $("preview-body");
+  const before = body.dataset.editor;
+  if (mode) body.dataset.editor = mode;
+  else delete body.dataset.editor;
+  const edit = $("toggle-edit");
+  edit.hidden = file?.kind !== "doc";
+  edit.classList.toggle("on", mode === "split");
+  edit.setAttribute("aria-pressed", String(mode === "split"));
+  if (mode && file) void editor.open(file);
+  else void editor.close();
+  if (before !== body.dataset.editor) requestAnimationFrame(() => preview.refit()); // the PDF's width changed
+}
+
+/** e: the source editor beside the PDF, on or off (remembered across documents). */
+export function toggleEditSource() {
+  const on = storage(STORED.editSource) !== "1";
+  storage(STORED.editSource, on ? "1" : "0");
+  showEditor(state.selected);
+  if (on) setTimeout(() => editor.focus(), 100); // once it has loaded the file
 }
 
 /** "2 agent files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */

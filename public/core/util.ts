@@ -10,6 +10,7 @@ export const STORED = {
   expanded: "expanded", // open folders in the tree
   showAgentFiles: "show-agent-files",
   versionStrip: "version-strip", // version bar shown
+  editSource: "edit-source", // documents open with the source editor beside the PDF ("1"/"0")
   // Panes shown ("1"/"0"), keyed by the pane's element id.
   treePane: "tree-pane",
   claudePane: "claude-pane",

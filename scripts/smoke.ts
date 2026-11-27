@@ -443,6 +443,67 @@ await check("a folder that can't be opened leaves the current workspace running"
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'after-refusal.md')", "new file listed", 10_000);
 });
 
+// ---------- the source editor ----------
+const notes = path.join(latex, "notes.md");
+const typeInEditor = async (text: string) => {
+  await js("document.querySelector('#editor .cm-content').focus()"); // the cursor starts at the top
+  await cdp.send("Input.insertText", { text });
+};
+
+await check("text files open in the editor; typing saves the file on its own", async () => {
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md' && document.getElementById('preview-body').dataset.editor === 'full'", "notes.md in the editor");
+  await waitFor("document.querySelector('#editor .cm-content')?.innerText.includes('first')", "its text");
+  await typeInEditor("typed in the editor\n");
+  await until(async () => (await Bun.file(notes).text()).startsWith("typed in the editor\n"), 10_000, "the edit on disk");
+  await waitFor("document.getElementById('editor-state').textContent === 'Saved'", "shows Saved");
+});
+
+await check("a change on disk (Claude) reloads the editor when it has no unsaved edits", async () => {
+  await Bun.write(notes, "# notes\n\n- rewritten by Claude\n");
+  await waitFor("document.querySelector('#editor .cm-content').innerText.includes('rewritten by Claude')", "the new text in the editor", 10_000);
+  expect(!(await js<boolean>("!document.getElementById('editor-conflict').hidden")), "asked even though nothing was unsaved");
+});
+
+await check("a change on disk while you have unsaved edits asks; Keep mine overwrites it", async () => {
+  await typeInEditor("mine\n");
+  await Bun.write(notes, "# notes\n\n- Claude again\n"); // lands before the editor's own save
+  await waitFor("!document.getElementById('editor-conflict').hidden", "the conflict bar", 10_000);
+  expect((await Bun.file(notes).text()).includes("Claude again"), "the editor overwrote the file without asking");
+  await click("#editor-keep-mine");
+  // The editor keeps your cursor across a reload, so "mine" lands wherever it was, not necessarily first.
+  await until(async () => {
+    const disk = await Bun.file(notes).text();
+    return disk.includes("mine\n") && !disk.includes("Claude again");
+  }, 10_000, "your version on disk");
+});
+
+await check("e puts the source beside the PDF; ⌘S in the editor saves the file, not the PDF", async () => {
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "main.tex" });
+  await press("Enter");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex built", 20_000);
+  await focusPreview();
+  await press("e");
+  await waitFor("document.getElementById('preview-body').dataset.editor === 'split' && document.querySelector('#editor .cm-content')?.innerText.includes('documentclass')", "the source beside the PDF", 10_000);
+  expect(await js<boolean>("!!document.querySelector('#viewer .pages')"), "the PDF isn't showing beside it");
+  const pdfWrites = await js<number>("window.__save.writes");
+  await typeInEditor("% edited by hand\n");
+  await press("s", [MOD]);
+  await until(async () => (await Bun.file(main).text()).startsWith("% edited by hand\n"), 3_000, "⌘S saved the source");
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "rebuilt", 20_000);
+  expect((await js<number>("window.__save.writes")) === pdfWrites, "⌘S in the editor saved the PDF");
+  await focusPreview();
+  await press("e");
+  await waitFor("document.getElementById('preview-body').dataset.editor === undefined", "the editor closed");
+  // Leave notes.md open: the workspace-switch checks expect it back as the last open file.
+  await press("p", [MOD]);
+  await waitFor("!document.getElementById('palette').hidden", "palette");
+  await cdp.send("Input.insertText", { text: "notes" });
+  await press("Enter");
+  await waitFor("document.getElementById('preview-title').textContent === 'latex/notes.md'", "notes.md open");
+});
+
 await check("switching workspaces swaps the files, the title and Claude's folder", async () => {
   await js(`fetch("/api/workspace/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: ${JSON.stringify(other)} }) })`);
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'other.tex')", "the other workspace's files", 20_000);
