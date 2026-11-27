@@ -312,7 +312,11 @@ await check("restores an earlier version (two clicks), file changes on disk", as
 });
 
 await check("Save PDF (mod+S) asks where once, then saves over that file", async () => {
+  // The restore above rebuilds main.tex: wait until that build has started and finished, since
+  // Save PDF (rightly) refuses while one is running. "Built" can still be the previous build's.
   await waitFor("document.getElementById('status').textContent.startsWith('Built')", "built", 20_000);
+  await Bun.sleep(600); // past the watcher's settle time, so a queued rebuild has begun
+  await waitFor("document.getElementById('status').textContent.startsWith('Built')", "the rebuild finished", 20_000);
   // Stand in for the system save dialog: count dialogs and writes, and keep the first bytes written.
   await js(`window.__save = { picks: 0, writes: 0, head: "" };
     window.showSaveFilePicker = async () => {
@@ -416,19 +420,24 @@ await check("won't save while the latest build has failed (the PDF would be olde
   await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md'", "notes.md open");
 });
 
-const openFolder = (dir: string) =>
-  fetch(`http://localhost:${port}${API.workspaceOpen}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir }) });
+const api = (route: string, body: object) =>
+  fetch(`http://localhost:${port}${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const openFolder = (dir: string) => api(API.workspaceOpen, { dir });
+const library = path.join(home, "projects"); // the scratch app-data folder's projects
 
-await check("refuses folders inside underleaf's checkout, without writing to them", async () => {
+await check("only projects open from the page; importing refuses underleaf's own folders, without writing to them", async () => {
+  const stray = path.join(tmp, "stray");
+  await mkdir(stray);
+  expect((await openFolder(stray)).status === 400, "a folder that isn't a project was opened");
   const templates = path.join(REPO, "templates", "resume", "files");
-  const res = await openFolder(templates);
-  expect(res.status === 400, `templates/resume/files: status ${res.status}`);
+  const res = await api(API.projectImport, { dir: templates });
+  expect(res.status === 400, `importing templates/resume/files: status ${res.status}`);
   expect(!(await Bun.file(path.join(templates, ".underleaf", "id")).exists()), "an id was written into the template");
 });
 
-await check("a folder that can't be opened leaves the current workspace running", async () => {
-  const locked = path.join(tmp, "locked");
-  await mkdir(locked);
+await check("a project that can't be opened leaves the current one running", async () => {
+  const locked = path.join(library, "locked");
+  await mkdir(locked, { recursive: true });
   await Bun.write(path.join(locked, "x.tex"), "\\documentclass{article}\n\\begin{document}x\\end{document}\n");
   await chmod(locked, 0o555);
   try {
@@ -579,8 +588,9 @@ await check("editing on the page: components (a title, a place, a paragraph) edi
   await waitFor("document.getElementById('preview-title').dataset.path === 'latex/notes.md'", "notes.md open");
 });
 
-await check("switching workspaces swaps the files, the title and Claude's folder", async () => {
-  await js(`fetch("/api/workspace/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: ${JSON.stringify(other)} }) })`);
+await check("importing a folder copies it in as a project and switches to it: files, title and Claude's folder", async () => {
+  expect((await api(API.projectImport, { dir: other })).status === 200, "the import failed");
+  expect(await Bun.file(path.join(other, "other.tex")).exists() && !(await Bun.file(path.join(other, ".underleaf", "id")).exists()), "the original folder was changed");
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'other.tex')", "the other workspace's files", 20_000);
   await waitFor("document.querySelector('#workspace-btn .ws-name').textContent === 'other'", "title bar names it");
   expect(!(await js<boolean>("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'main.tex')")), "old files still listed");
@@ -596,8 +606,8 @@ await check("switching back from the title bar restores that workspace's history
 });
 
 await check("a copied folder gets its own id and history, starting from the original's", async () => {
-  const copy = path.join(tmp, "latex-copy");
-  await cp(latex, copy, { recursive: true }); // like Finder's Duplicate: .underleaf/id comes along
+  const copy = path.join(library, "latex-copy");
+  await cp(latex, copy, { recursive: true }); // like Finder's Duplicate in the library: .underleaf/id comes along
   expect((await openFolder(copy)).status === 200, "couldn't open the copy");
   await waitFor("document.querySelector('#workspace-btn .ws-name')?.textContent === 'latex-copy'", "title bar names the copy", 20_000);
   const idOf = async (dir: string) => (await Bun.file(path.join(dir, ".underleaf", "id")).text()).trim();
@@ -606,11 +616,16 @@ await check("a copied folder gets its own id and history, starting from the orig
   expect(labels.includes("Claude: Tighten the bullets"), `the copy's history doesn't start from the original's: ${labels.join(" | ")}`);
 });
 
-await check("an empty folder offers the templates; starting one fills it and gives Claude its instructions", async () => {
-  const fresh = path.join(tmp, "fresh");
-  await mkdir(fresh);
+await check("New project… names an empty project, which offers the templates; starting one fills it and gives Claude its instructions", async () => {
+  await click("#workspace-btn");
+  await waitFor("[...document.querySelectorAll('.menu li .label')].some(l => l.textContent === 'New project…')", "the menu");
+  await js("[...document.querySelectorAll('.menu li')].find(li => li.querySelector('.label')?.textContent === 'New project…').click()");
+  await waitFor("!document.getElementById('ask').hidden && document.activeElement?.id === 'ask-input'", "the name prompt");
+  await cdp.send("Input.insertText", { text: "Fresh" });
+  await press("Enter");
+  const fresh = path.join(library, "fresh");
+  await waitFor("document.querySelector('#workspace-btn .ws-name')?.textContent === 'Fresh'", "the new project open", 20_000);
   await Bun.write(path.join(fresh, "notes.txt"), "keep me\n"); // something that isn't LaTeX: still counts as empty
-  expect((await openFolder(fresh)).status === 200, "couldn't open the folder");
   await waitFor("document.querySelectorAll('.template-card').length === 4", "four template cards", 20_000);
   await click(".template-card[data-template='thesis']");
   await waitFor("document.getElementById('preview-title').dataset.path === 'latex/main.tex' && document.getElementById('status').textContent.startsWith('Built')", "main.tex open and built", 30_000);
@@ -626,6 +641,17 @@ await check("an empty folder offers the templates; starting one fills it and giv
   expect(again.status === 409, `a second template over existing .tex files: status ${again.status}`);
 });
 
+await check("renaming a project changes its name, not its folder", async () => {
+  await click("#workspace-btn");
+  await waitFor("[...document.querySelectorAll('.menu li .label')].some(l => l.textContent.startsWith('Rename'))", "Rename in the menu");
+  await js("[...document.querySelectorAll('.menu li')].find(li => li.querySelector('.label')?.textContent.startsWith('Rename')).click()");
+  await waitFor("document.activeElement?.id === 'ask-input' && document.activeElement.value === 'Fresh'", "the prompt with the current name");
+  await cdp.send("Input.insertText", { text: "Thesis draft" });
+  await press("Enter");
+  await waitFor("document.querySelector('#workspace-btn .ws-name')?.textContent === 'Thesis draft'", "the new name in the title bar");
+  expect((await Bun.file(path.join(library, "fresh", ".underleaf", "name")).text()).trim() === "Thesis draft", "the name isn't stored with the project");
+});
+
 await check("a resume workspace from before templates keeps its CLAUDE.md import, without a second copy", async () => {
   const { claudeMdImportsInstructions, templateOf } = await import("../src/workspace/templates");
   const old = path.join(tmp, "old-resume");
@@ -635,13 +661,13 @@ await check("a resume workspace from before templates keeps its CLAUDE.md import
   expect(await claudeMdImportsInstructions(old), "the import wasn't recognized (Claude would get the instructions twice)");
 });
 
-await check("a workspace folder that disappears isn't recreated", async () => {
-  const doomed = path.join(tmp, "doomed");
-  await mkdir(doomed);
+await check("a project folder that disappears isn't recreated", async () => {
+  const doomed = path.join(library, "doomed");
+  await mkdir(doomed, { recursive: true });
   await Bun.write(path.join(doomed, "d.tex"), "\\documentclass{article}\n\\begin{document}d\\end{document}\n");
   expect((await openFolder(doomed)).status === 200, "couldn't open the folder");
   await waitFor("[...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'd.tex')", "its files", 20_000);
-  await rename(doomed, path.join(tmp, "doomed-moved")); // as if moved to the trash
+  await rename(doomed, path.join(tmp, "doomed-moved")); // as if moved to the trash in Finder
   await waitFor("![...document.querySelectorAll('#tree .row .name')].some(n => n.textContent === 'd.tex')", "files gone from the tree", 10_000);
   await Bun.sleep(1500); // past the 1 s health check (and the brief's debounce)
   expect(!(await Bun.file(doomed).exists()) && !(await stat(doomed).catch(() => null)), "the folder was recreated");

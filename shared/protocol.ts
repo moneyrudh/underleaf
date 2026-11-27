@@ -16,10 +16,16 @@ export const API = {
   fileSave: "/api/file/save",
   /** POST SavedRequest → SavedResponse — record that a document's PDF was saved (a marker in its history). */
   saved: "/api/saved",
-  /** POST OpenWorkspaceRequest → OpenWorkspaceResponse — switch to another folder. */
+  /** POST OpenWorkspaceRequest → OpenWorkspaceResponse — switch to another project (a library project, or a folder opened before). */
   workspaceOpen: "/api/workspace/open",
-  /** POST → PickFolderResponse — show the system's folder dialog (on the machine running underleaf) and open the choice. */
-  workspacePick: "/api/workspace/pick",
+  /** POST NewProjectRequest → OpenWorkspaceResponse — a new, empty project in the library, opened. */
+  projectNew: "/api/projects/new",
+  /** POST NewProjectRequest → OpenWorkspaceResponse — rename the open project (its folder stays put). */
+  projectRename: "/api/projects/rename",
+  /** POST ImportRequest → PickFolderResponse — copy a folder into the library (the system's folder dialog when no `dir`) and open it. */
+  projectImport: "/api/projects/import",
+  /** POST → OpenWorkspaceResponse — show the open project's folder in Finder / Explorer. */
+  projectReveal: "/api/projects/reveal",
   /** GET → TemplatesResponse — the templates, and whether this workspace can start from one. */
   templates: "/api/templates",
   /** POST StartTemplateRequest → StartTemplateResponse — fill an empty workspace from a template. */
@@ -70,7 +76,11 @@ export type CompiledMessage = {
   pdf: string | null; // the latest good PDF, or null if it has never compiled
 };
 /** Which folder is open, sent on connect and whenever it changes. A tab reloads when the id changes. */
-export type WorkspaceMessage = { type: "workspace"; id: string; dir: string; name: string; recent: { dir: string; name: string }[] };
+/**
+ * `projects`: what the switcher lists, most recently used first (every library project, and folders
+ * opened in developer mode). `inLibrary`: the open project is one of underleaf's own (it can be renamed).
+ */
+export type WorkspaceMessage = { type: "workspace"; id: string; dir: string; name: string; inLibrary: boolean; projects: { dir: string; name: string }[] };
 export type ServerMessage = WorkspaceMessage | TreeMessage | HistoryMessage | CompilingMessage | CompiledMessage;
 
 // ---------- websocket: page → server ----------
@@ -91,6 +101,9 @@ export type SavedRequest = { doc: string; name: string; how: "saved" | "download
 export type SavedResponse = { ok: true } | { error: string };
 
 export type OpenWorkspaceRequest = { dir: string };
+export type NewProjectRequest = { name: string };
+/** `dir`: copy this folder; without it, the server shows its folder dialog. */
+export type ImportRequest = { dir?: string };
 export type OpenWorkspaceResponse = { ok: true } | { error: string };
 export type PickFolderResponse = { ok: true; dir: string } | { cancelled: true } | { error: string };
 

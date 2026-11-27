@@ -14,7 +14,7 @@ export let latexTree: DirNode;
 export let docs: string[] = [];
 
 export async function rescan() {
-  latexTree = await scanTree(current().dir, "latex");
+  latexTree = await scanTree(current().dir, "latex", current().name);
   docs = documentsIn(latexTree).map((d) => `latex/${d}`);
 }
 
