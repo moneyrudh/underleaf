@@ -92,6 +92,24 @@
   overflow: hidden;
   white-space: pre-wrap;
 }
+/* A link's address, under the text box: app UI, not part of the page. */
+.edit-links {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 4px;
+  min-width: 260px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  font: 12px var(--ui);
+}
+.edit-link { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.edit-link input { flex: 1; min-width: 200px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--chrome); color: var(--ink); font: 12px var(--mono); }
+.edit-link input:focus { outline: 2px solid var(--leaf); outline-offset: -1px; }
+.edit-links.pending { opacity: 0.7; }
 /* Written to the source; the rebuilt page replaces it in a moment. */
 .edit-input.pending { outline-style: dashed; opacity: 0.85; cursor: progress; }
 .viewer.stale .edit-layer { display: none; }

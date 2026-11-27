@@ -26,15 +26,13 @@ export function initWorkspaces() {
   };
 }
 
-/** The title bar: the folder's name, with its path beside it. */
+/** The title bar: the workspace's name (its folder's path is in the tooltip and the menu). */
 export function showWorkspace() {
   const ws = state.workspace;
   if (!ws) return;
   button.querySelector(".ws-name")!.textContent = ws.name;
-  button.querySelector(".ws-path")!.textContent = short(ws.dir);
   button.dataset.tip = `${short(ws.dir)} · switch workspace`;
   document.title = `${ws.name} · underleaf`;
-  $("claude-where").textContent = ws.name;
 }
 
 export async function switchTo(dir: string) {

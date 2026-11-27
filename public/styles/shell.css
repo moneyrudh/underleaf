@@ -27,7 +27,6 @@
 }
 .workspace-btn:hover, .workspace-btn[aria-expanded="true"] { background: var(--sunken); }
 .workspace-btn .ws-name { font-weight: 500; }
-.workspace-btn .ws-path { font: 11.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .workspace-btn .chev { font-size: 10px; color: var(--muted); }
 .tb-left { align-items: center; }
 .connection { color: var(--error); font-size: 12px; white-space: nowrap; }

@@ -86,7 +86,8 @@ export function open(file: FileNode) {
   state.recent = [file.path, ...state.recent.filter((p) => p !== file.path)].slice(0, 30);
   storage(STORED.recent, JSON.stringify(state.recent));
   document.title = `${file.name} · underleaf`;
-  ui.title.textContent = file.path;
+  ui.title.textContent = displayPath(file.path);
+  ui.title.dataset.path = file.path;
   showEditor(file);
 
   const isDoc = file.kind === "doc";
@@ -132,6 +133,7 @@ export function showNothing() {
   leaveSnapshot();
   versions.setFile(null, state.historyEnabled);
   ui.title.textContent = "Preview";
+  delete ui.title.dataset.path;
   hideDocumentActions();
   preview.showLogsButton(false);
   preview.setStatus("");
@@ -177,20 +179,23 @@ export function toggleMiddle() {
   showMiddle($("claude-pane").dataset.mid === "source" ? "claude" : "source", true);
 }
 
-/** "2 agent files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */
+/** "2 of Claude's files hidden · Show": CLAUDE.md and memory/ stay out of the way but easy to find. */
 function showAgentFoot() {
   const n = tree.agentFileCount;
   $("tree-foot").hidden = n === 0;
-  $("agent-count").textContent = tree.agentFilesVisible ? `Agent files shown` : `${n} agent file${n === 1 ? "" : "s"} hidden`;
+  $("agent-count").textContent = tree.agentFilesVisible ? `Claude's files shown` : `${n} of Claude's files hidden`;
   $("agent-toggle").textContent = tree.agentFilesVisible ? "Hide" : "Show";
 }
 
 export function toggleAgentFiles(visible: boolean) {
   tree.setAgentFilesVisible(visible);
   showAgentFoot();
-  toast(visible ? "Agent files shown: CLAUDE.md and memory/" : "Agent files hidden");
+  toast(visible ? "Claude's files shown: CLAUDE.md and memory/" : "Claude's files hidden");
   if (visible) focusPane("tree");
 }
+
+/** A file as people see it: its path inside the workspace, without the internal "latex/" root key. */
+export const displayPath = (treePath: string) => treePath.replace(/^latex\//, "");
 
 // ---------- acting on files ----------
 

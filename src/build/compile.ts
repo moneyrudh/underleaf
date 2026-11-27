@@ -29,7 +29,12 @@ export async function detectEngine(texPath: string): Promise<Engine> {
 
 export async function compile(texPath: string, outDir: string): Promise<CompileResult> {
   const start = performance.now();
-  const engine = await detectEngine(texPath);
+  // The file can vanish between the change that queued this build and now (deleted, moved, its folder trashed).
+  if (!(await Bun.file(texPath).exists())) {
+    const message = `${path.basename(texPath)} isn't there anymore`;
+    return { ok: false, engine: "pdflatex", pdfPath: "", pages: 0, diagnostics: [{ severity: "error", message }], ms: 0 };
+  }
+  const engine = await detectEngine(texPath).catch(() => "pdflatex" as const);
   const name = path.basename(texPath, ".tex");
   const cwd = path.dirname(texPath);
   const logPath = path.join(outDir, `${name}.log`);
